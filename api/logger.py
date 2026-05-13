@@ -11,6 +11,8 @@ Run standalone: python -m api.logger
 
 from dataclasses import dataclass, asdict
 import json
+import os
+import time
 
 
 @dataclass
@@ -38,14 +40,49 @@ class QueryLogger:
         Log a query and its answer.
         Uses answer.rewritten_question for the rewritten field.
         """
-        ...
+        os.makedirs(os.path.dirname(self._log_path), exist_ok=True)
+        entry = QueryLog(
+            timestamp=time.time(),
+            user_id=message.user_id,
+            platform=message.platform,
+            question=message.text,
+            rewritten_question=answer.rewritten_question,
+            answer=answer.text,
+            confidence=answer.confidence,
+            is_fallback=answer.is_fallback,
+            top_chunk_subject=(
+                answer.source_chunks[0].metadata.get("subject", "")
+                if answer.source_chunks else ""
+            ),
+        )
+        with open(self._log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
 
     def read_logs(self, limit: int = 50, fallback_only: bool = False) -> list[dict]:
         """Read recent logs from the file."""
-        ...
+        if not os.path.exists(self._log_path):
+            return []
+        with open(self._log_path, encoding="utf-8") as f:
+            lines = f.readlines()
+        logs = [json.loads(line) for line in lines if line.strip()]
+        if fallback_only:
+            logs = [log for log in logs if log["is_fallback"]]
+        return logs[-limit:]
 
 
 if __name__ == "__main__":
-    logger = QueryLogger()
-    print(f"Log path: {logger._log_path}")
-    print("✓ QueryLogger instantiates correctly.")
+    from core.models import Message, Answer
+
+    logger = QueryLogger("logs/test_queries.jsonl")
+    msg = Message(
+        user_id="test", session_id="s1",
+        text="test question", timestamp=0.0, platform="web"
+    )
+    ans = Answer(
+        text="test answer", confidence=0.9,
+        rewritten_question="rewritten test question"
+    )
+    logger.log(msg, ans)
+    logs = logger.read_logs()
+    print(f"Logged {len(logs)} entries: {logs}")
+    print("✓ QueryLogger works correctly.")
