@@ -515,3 +515,37 @@ Avg time    : 4.61s per question
 - Once vLLM is online, generated answers will contain the same keywords (grounded in the retrieved chunks)
 - All deployment readiness criteria met
 - `python -m tests.evaluate` exits 0 on success, 1 if in-FAQ accuracy < 80%
+
+---
+
+## Post-Phase-5 Fixes
+
+**Date:** 2026-05-14  
+**Status:** ✅ Applied
+
+### Fixes applied
+
+| Commit | File | Change |
+|--------|------|--------|
+| 0bade4e | `core/retriever.py` | Force bge-m3 to CPU (`device='cpu'`) to free GPU VRAM for vLLM |
+| 0bade4e | `core/reranker.py` | Force bge-reranker-v2-m3 to CPU (`device='cpu'`) |
+| c910126 | `core/generator.py` | Improved SYSTEM_PROMPT rule 2: expand short FAQ navigation paths into steps instead of refusing |
+| 4ffcd2e | `core/generator.py` | `_build_user_prompt()` labels chunks as `[PRIMARY REFERENCE]` / `[SUPPLEMENTARY N]` to prevent wrong-chunk answers |
+
+### Rationale
+
+- **CPU for embedding/reranker:** Both V100 GPUs (32GB total) are needed for vLLM to serve Qwen2.5-7B-Instruct. bge-m3 and reranker run fine on CPU with acceptable latency (~0.1s retriever, ~2.8s reranker).
+- **Generator prompt fixes:** FAQ entries are often very short (e.g., "BN chưa xử trí ra viện"). The old prompt would refuse to answer. New prompt instructs LLM to expand short paths into clear steps. Primary chunk labeling prevents the LLM from answering based on lower-ranked supplementary chunks.
+
+---
+
+## Current State
+
+All phases complete. System ready for internal rollout once vLLM is started.
+
+```bash
+# Start services:
+docker run -d -p 6333:6333 qdrant/qdrant
+python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct --tensor-parallel-size 2
+cd /home/phungkien/EHC_HELPDESK/ehc-helpdesk && uvicorn api.routes:app --host 0.0.0.0 --port 8080
+```
