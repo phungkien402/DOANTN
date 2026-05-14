@@ -539,13 +539,46 @@ Avg time    : 4.61s per question
 
 ---
 
-## Current State
+## Deployment — systemd Services
 
-All phases complete. System ready for internal rollout once vLLM is started.
+**Date:** 2026-05-14  
+**Status:** ✅ Complete
+
+### What was done
+
+1. **`deploy/ehc-vllm.service`** — systemd unit for vLLM server (Qwen2.5-7B-Instruct, tensor-parallel-size 2, 90% GPU memory utilization)
+2. **`deploy/ehc-helpdesk.service`** — systemd unit for FastAPI server (uvicorn on port 8080, depends on vLLM)
+3. **`core/query_rewriter.py`** — Added Vietnamese colloquial few-shot examples to improve rewriting quality
+
+### Service configuration
+
+| Service | Port | Restart | Depends on |
+|---------|------|---------|------------|
+| ehc-vllm | 8000 | on-failure (10s) | network |
+| ehc-helpdesk | 8080 | on-failure (5s) | network + ehc-vllm |
+
+### Installation
 
 ```bash
-# Start services:
-docker run -d -p 6333:6333 qdrant/qdrant
-python -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct --tensor-parallel-size 2
-cd /home/phungkien/EHC_HELPDESK/ehc-helpdesk && uvicorn api.routes:app --host 0.0.0.0 --port 8080
+sudo cp deploy/ehc-vllm.service /etc/systemd/system/
+sudo cp deploy/ehc-helpdesk.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable ehc-vllm ehc-helpdesk
+sudo systemctl start ehc-vllm ehc-helpdesk
+```
+
+---
+
+## Current State
+
+All phases complete. Services configured for permanent operation via systemd.
+
+```bash
+# Check service status:
+sudo systemctl status ehc-vllm
+sudo systemctl status ehc-helpdesk
+
+# View logs:
+journalctl -u ehc-vllm -f
+journalctl -u ehc-helpdesk -f
 ```
