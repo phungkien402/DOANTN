@@ -41,11 +41,16 @@ def _build_user_prompt(query: str, chunks: list[RetrievedChunk]) -> str:
     """Build the user prompt with context chunks and question."""
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
-        context_parts.append(f"[{i}] {chunk.text}")
+        label = "[PRIMARY REFERENCE]" if i == 1 else f"[SUPPLEMENTARY {i}]"
+        context_parts.append(f"{label}\n{chunk.text}")
 
     context = "\n\n---\n\n".join(context_parts)
 
-    return f"CONTEXT:\n{context}\n\n---\n\nQUESTION: {query}"
+    return (
+        f"CONTEXT:\n{context}\n\n---\n\n"
+        f"QUESTION: {query}\n\n"
+        f"Note: Answer based primarily on the [PRIMARY REFERENCE] above."
+    )
 
 
 def generate(query: str, chunks: list[RetrievedChunk]) -> str:
