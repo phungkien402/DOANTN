@@ -24,7 +24,7 @@ from config import RETRIEVER_TOP_K, RERANKER_TOP_N, CONFIDENCE_THRESHOLD, MAINTE
 from core.models import Message, Answer
 from core import query_rewriter, retriever, reranker, generator, confidence, fallback
 from core.query_rewriter import analyze_and_rewrite
-from core.generator import GeneratorError
+from core.generator import GeneratorError, LLMUnavailableError
 
 # --- Maintenance mode (toggled at runtime via /admin/maintenance) ---
 _maintenance_mode: bool = MAINTENANCE_MODE
@@ -79,10 +79,20 @@ def run(message: Message, session_history: list) -> Answer:
 
     # Step 2: Analyze intent + rewrite query in a single LLM call
     print(f"\n[PIPELINE] Step 2: Analyze + Rewrite (single call)")
-    if fast_chunks:
-        user_intent, rewritten = analyze_and_rewrite(message.text, chunks=fast_chunks)
-    else:
-        user_intent, rewritten = analyze_and_rewrite(message.text)
+    try:
+        if fast_chunks:
+            user_intent, rewritten = analyze_and_rewrite(message.text, chunks=fast_chunks)
+        else:
+            user_intent, rewritten = analyze_and_rewrite(message.text)
+    except LLMUnavailableError:
+        print("[PIPELINE] vLLM unavailable during analyze+rewrite → LLM unavailable response")
+        return Answer(
+            text="⚠️ Hệ thống AI đang bận hoặc đang khởi động lại, vui lòng thử lại sau 1–2 phút. Nếu vẫn lỗi, liên hệ bộ phận IT để kiểm tra server.",
+            confidence=0.0,
+            source_chunks=[],
+            is_fallback=True,
+            rewritten_question="",
+        )
     print(f"[PIPELINE] analyze_and_rewrite: intent=\"{user_intent}\" query=\"{rewritten}\"")
 
     # Step 3: Full retrieve with rewritten query
@@ -110,6 +120,15 @@ def run(message: Message, session_history: list) -> Answer:
     print(f"\n[PIPELINE] Step 6: Generate answer")
     try:
         answer_text = generator.generate(rewritten, ranked_chunks, session_history, user_intent=user_intent)
+    except LLMUnavailableError:
+        print("[PIPELINE] vLLM unavailable during generation → LLM unavailable response")
+        return Answer(
+            text="⚠️ Hệ thống AI đang bận hoặc đang khởi động lại, vui lòng thử lại sau 1–2 phút. Nếu vẫn lỗi, liên hệ bộ phận IT để kiểm tra server.",
+            confidence=0.0,
+            source_chunks=[],
+            is_fallback=True,
+            rewritten_question=rewritten,
+        )
     except GeneratorError:
         print("[PIPELINE] Generator failed (vLLM unavailable) → fallback")
         return fallback.handle(message, session_history)

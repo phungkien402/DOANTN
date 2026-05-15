@@ -82,6 +82,11 @@ class GeneratorError(Exception):
     pass
 
 
+class LLMUnavailableError(GeneratorError):
+    """Raised specifically when vLLM is unreachable after retry (APIConnectionError)."""
+    pass
+
+
 def generate(query: str, chunks: list[RetrievedChunk], history: list[dict] = None, user_intent: str = None) -> str:
     """
     Generate an answer grounded in the provided chunks.
@@ -133,7 +138,7 @@ def generate(query: str, chunks: list[RetrievedChunk], history: list[dict] = Non
             return answer
         except Exception as retry_e:
             print(f"[GENERATOR] Retry failed ({type(retry_e).__name__}: {retry_e})")
-            raise GeneratorError(str(retry_e)) from retry_e
+            raise LLMUnavailableError(str(retry_e)) from retry_e
 
     except Exception as e:
         error_msg = f"[GENERATOR] vLLM unavailable ({type(e).__name__}: {e})"

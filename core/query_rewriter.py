@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from openai import OpenAI, APIConnectionError
 
 from config import VLLM_BASE_URL, VLLM_MODEL
+from core.generator import LLMUnavailableError
 
 # Module-level client — created once when module is first imported
 _client = OpenAI(base_url=f"{VLLM_BASE_URL}/v1", api_key="not-needed")
@@ -176,9 +177,9 @@ def rewrite(text: str) -> str:
             rewritten = response.choices[0].message.content.strip()
             print(f"[REWRITER] Rewritten (retry): \"{rewritten}\"")
             return rewritten
-        except Exception:
-            print(f"[REWRITER] Retry failed, using original query")
-            return text
+        except Exception as retry_e:
+            print(f"[REWRITER] Retry failed ({type(retry_e).__name__}), raising LLMUnavailableError")
+            raise LLMUnavailableError(str(retry_e)) from retry_e
 
     except Exception as e:
         print(f"[REWRITER] vLLM unavailable ({type(e).__name__}), using original query")
@@ -273,9 +274,9 @@ def analyze_and_rewrite(query: str, chunks: list = None) -> tuple[str | None, st
             print(f"[ANALYZE+REWRITE] Intent (retry): \"{intent}\"")
             print(f"[ANALYZE+REWRITE] Rewritten (retry): \"{rewritten}\"")
             return intent, rewritten
-        except Exception:
-            print(f"[ANALYZE+REWRITE] Retry failed, using original query")
-            return None, query
+        except Exception as retry_e:
+            print(f"[ANALYZE+REWRITE] Retry failed ({type(retry_e).__name__}), raising LLMUnavailableError")
+            raise LLMUnavailableError(str(retry_e)) from retry_e
 
     except Exception as e:
         print(f"[ANALYZE+REWRITE] vLLM unavailable ({type(e).__name__}), using original query")
