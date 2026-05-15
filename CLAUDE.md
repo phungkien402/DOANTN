@@ -12,12 +12,16 @@ EHC AI Helpdesk — an on-premise RAG chatbot that answers doctors' questions ab
 Platform (Zalo/Telegram/Web) → Adapter → FastAPI Gateway → RAG Pipeline → Response
 ```
 
-RAG Pipeline (5 steps in `core/pipeline.py`):
-1. Query Rewriter (`core/query_rewriter.py`) — colloquial Vietnamese → formal query via LLM
-2. Retriever (`core/retriever.py`) — embed query with bge-m3, fetch Top-K from Qdrant
-3. Reranker (`core/reranker.py`) — cross-encoder rescore with bge-reranker-v2-m3, keep Top-N
-4. Generator (`core/generator.py`) — vLLM (Qwen2.5-7B-Instruct) generates grounded answer
-5. Confidence Check (`core/confidence.py`) — route to fallback if top score < threshold
+RAG Pipeline (7 steps in `core/pipeline.py` — iterative retrieval):
+1. Fast Retrieve (`core/retriever.py`) — embed original query, get top 3 chunks (no rerank)
+2. Contextual Intent Analysis (`core/query_rewriter.py:analyze_intent`) — LLM analyzes intent WITH chunk context
+3. Query Rewrite (`core/query_rewriter.py:rewrite`) — colloquial Vietnamese → formal query, informed by grounded intent
+4. Full Retrieve (`core/retriever.py`) — embed rewritten query, fetch Top-K from Qdrant
+5. Reranker (`core/reranker.py`) — cross-encoder rescore with bge-reranker-v2-m3, keep Top-N
+6. Confidence Check (`core/confidence.py`) — route to fallback if top score < threshold
+7. Generator (`core/generator.py`) — vLLM (Qwen2.5-7B-Instruct) generates grounded answer
+
+Why iterative: LLM needs EHC context to analyze intent accurately — blind intent analysis is ineffective for domain-specific terminology. The fast retrieve gives the LLM real FAQ context before it reasons about the user's problem.
 
 Key separation: `core/` never imports from `adapters/`. Only `api/routes.py` bridges them.
 
@@ -72,6 +76,14 @@ Key separation: `core/` never imports from `adapters/`. Only `api/routes.py` bri
 /bin/bash -c "export PATH=/home/phungkien/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && cd /home/phungkien/EHC_HELPDESK/ehc-helpdesk && git commit -m 'your message'"
 /bin/bash -c "export PATH=/home/phungkien/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && cd /home/phungkien/EHC_HELPDESK/ehc-helpdesk && git push origin main"
 ```
+
+### Branching Rules
+
+- For new features or experimental changes, always create a new branch first:
+  `git checkout -b feature/<short-description>`
+- Only merge to main after the reviewer (via Cowork) approves
+- Branch naming convention: `feature/<name>`, `fix/<name>`, `experiment/<name>`
+- Never commit experimental or untested changes directly to main
 
 ## Critical Design Decisions
 
