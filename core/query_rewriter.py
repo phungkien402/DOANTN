@@ -8,11 +8,12 @@ Run standalone: python -m core.query_rewriter
 """
 
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from openai import OpenAI
+from openai import OpenAI, APIConnectionError
 
 from config import VLLM_BASE_URL, VLLM_MODEL
 
@@ -115,6 +116,27 @@ def analyze_intent(query: str, chunks: list = None) -> str | None:
         print(f"[INTENT] Result: \"{intent}\"")
         return intent
 
+    except APIConnectionError as e:
+        # Retry once after 1s — vLLM may be busy
+        print(f"[INTENT] Connection error, retrying in 1s...")
+        time.sleep(1)
+        try:
+            response = _client.chat.completions.create(
+                model=VLLM_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                max_tokens=100,
+                temperature=0.1,
+            )
+            intent = response.choices[0].message.content.strip()
+            print(f"[INTENT] Result (retry): \"{intent}\"")
+            return intent
+        except Exception:
+            print(f"[INTENT] Retry failed, skipping intent analysis")
+            return None
+
     except Exception as e:
         print(f"[INTENT] vLLM unavailable ({type(e).__name__}), skipping intent analysis")
         return None
@@ -139,6 +161,24 @@ def rewrite(text: str) -> str:
         rewritten = response.choices[0].message.content.strip()
         print(f"[REWRITER] Rewritten: \"{rewritten}\"")
         return rewritten
+
+    except APIConnectionError as e:
+        # Retry once after 1s — vLLM may be busy
+        print(f"[REWRITER] Connection error, retrying in 1s...")
+        time.sleep(1)
+        try:
+            response = _client.chat.completions.create(
+                model=VLLM_MODEL,
+                messages=_build_messages(text),
+                max_tokens=150,
+                temperature=0.1,
+            )
+            rewritten = response.choices[0].message.content.strip()
+            print(f"[REWRITER] Rewritten (retry): \"{rewritten}\"")
+            return rewritten
+        except Exception:
+            print(f"[REWRITER] Retry failed, using original query")
+            return text
 
     except Exception as e:
         print(f"[REWRITER] vLLM unavailable ({type(e).__name__}), using original query")

@@ -9,11 +9,12 @@ Run standalone: python -m core.generator
 """
 
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from openai import OpenAI
+from openai import OpenAI, APIConnectionError
 
 from config import VLLM_BASE_URL, VLLM_MODEL
 from core.models import RetrievedChunk
@@ -110,6 +111,29 @@ def generate(query: str, chunks: list[RetrievedChunk], history: list[dict] = Non
         print(f"[GENERATOR] Response: \"{answer[:100]}...\"")
         print(f"[GENERATOR] Tokens used: {tokens_used}")
         return answer
+
+    except APIConnectionError as e:
+        # Retry once after 2s — vLLM may be busy with another request
+        print(f"[GENERATOR] Connection error, retrying in 2s...")
+        time.sleep(2)
+        try:
+            response = _client.chat.completions.create(
+                model=VLLM_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=512,
+                temperature=0.1,
+            )
+            answer = response.choices[0].message.content.strip()
+            tokens_used = response.usage.total_tokens if response.usage else "N/A"
+            print(f"[GENERATOR] Response (retry): \"{answer[:100]}...\"")
+            print(f"[GENERATOR] Tokens used: {tokens_used}")
+            return answer
+        except Exception as retry_e:
+            print(f"[GENERATOR] Retry failed ({type(retry_e).__name__}: {retry_e})")
+            raise GeneratorError(str(retry_e)) from retry_e
 
     except Exception as e:
         error_msg = f"[GENERATOR] vLLM unavailable ({type(e).__name__}: {e})"
