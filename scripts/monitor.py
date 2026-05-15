@@ -3,7 +3,7 @@
 EHC Helpdesk Service Monitor
 
 Checks health of ehc-helpdesk and ehc-vllm services every 60 seconds.
-If a service fails 2 consecutive checks, sends an email alert and attempts restart.
+If a service fails 5 consecutive checks, sends an email alert and attempts restart.
 
 Environment variables:
     ALERT_EMAIL_FROM     — sender email address
@@ -43,7 +43,7 @@ SERVICES = [
 ]
 
 CHECK_INTERVAL = 60  # seconds
-FAIL_THRESHOLD = 2   # consecutive failures before alert + restart
+FAIL_THRESHOLD = 5   # consecutive failures before alert + restart (~5 min grace for vLLM startup)
 HTTP_TIMEOUT = 10    # seconds
 
 # Email config from environment

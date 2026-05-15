@@ -69,6 +69,7 @@ ZALO_ACCESS_TOKEN = _get("ZALO_ACCESS_TOKEN", "")
 # --- Slack ---
 SLACK_BOT_TOKEN = _get("SLACK_BOT_TOKEN", "")
 SLACK_SIGNING_SECRET = _get("SLACK_SIGNING_SECRET", "")
+SLACK_ADMIN_USERS = [u.strip() for u in _get("SLACK_ADMIN_USERS", "").split(",") if u.strip()]
 
 
 if __name__ == "__main__":

@@ -82,6 +82,19 @@ async def handle_webhook(platform: str, request: Request, background_tasks: Back
     if adapter is None:
         raise HTTPException(status_code=400, detail=f"Unknown platform: {platform}")
 
+    # --- Slack slash commands (form-encoded) ---
+    content_type = request.headers.get("content-type", "")
+    if platform == "slack" and "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        form_data = dict(form)
+        # Slash commands have a "command" field
+        if "command" in form_data:
+            response_text = await adapter.handle_slash_command(form_data)
+            return JSONResponse(
+                content={"response_type": "ephemeral", "text": response_text},
+                status_code=200,
+            )
+
     # Parse raw payload
     try:
         raw = await request.json()
