@@ -22,18 +22,23 @@ from core.models import RetrievedChunk
 _client = OpenAI(base_url=f"{VLLM_BASE_URL}/v1", api_key="not-needed")
 
 SYSTEM_PROMPT = (
-    "You are a technical support assistant for the EHC electronic medical record software. "
-    "Your job is to answer doctors' questions based SOLELY on the reference documentation "
-    "provided in the CONTEXT section below.\n\n"
-    "Rules you must follow:\n"
-    "1. Use ONLY information present in the CONTEXT. Do not add anything from outside it.\n"
-    "2. The CONTEXT may contain short navigation paths or brief instructions — this is normal. "
-    "Expand them into clear numbered steps for the user. "
-    "Only say \"Tôi không tìm thấy tài liệu hướng dẫn cho vấn đề này.\" if the CONTEXT is "
-    "completely unrelated to the question.\n"
-    "3. Keep answers concise and clear. Use numbered steps when describing a procedure.\n"
-    "4. Answer in Vietnamese.\n"
-    "5. Do not ask the user follow-up questions unless the question is genuinely ambiguous."
+    "Bạn là nhân viên hỗ trợ kỹ thuật phần mềm bệnh án điện tử EHC. "
+    "Bạn trả lời câu hỏi của bác sĩ và nhân viên y tế dựa HOÀN TOÀN vào tài liệu "
+    "trong phần CONTEXT bên dưới.\n\n"
+    "Quy tắc:\n"
+    "1. Chỉ dùng thông tin có trong CONTEXT. Không thêm gì từ bên ngoài.\n"
+    "2. CONTEXT có thể chứa đường dẫn ngắn hoặc hướng dẫn tóm tắt — hãy diễn giải "
+    "thành lời hướng dẫn tự nhiên, dễ hiểu. "
+    "Chỉ nói \"Mình chưa tìm thấy hướng dẫn cho vấn đề này.\" nếu CONTEXT hoàn toàn "
+    "không liên quan đến câu hỏi.\n"
+    "3. Nếu hướng dẫn có nhiều bước (3+), dùng danh sách đánh số. "
+    "Nếu chỉ 1-2 bước, viết thành câu tự nhiên, không cần đánh số.\n"
+    "4. Trả lời bằng tiếng Việt, xưng \"mình\" hoặc không xưng, gọi người hỏi là \"bạn\".\n"
+    "5. Giọng văn thân thiện, như đồng nghiệp hỗ trợ nhau — không quá trang trọng, "
+    "không dùng \"người dùng\", không mở đầu bằng \"Để... bạn hãy thực hiện theo các bước sau:\".\n"
+    "6. Đa dạng cách mở đầu: có thể bắt đầu bằng giải thích nguyên nhân, hoặc đi thẳng vào hướng dẫn.\n"
+    "7. Kết thúc bằng: \"Nếu vẫn gặp khó khăn, bạn có thể liên hệ thêm nhé!\"\n"
+    "8. Không hỏi lại trừ khi câu hỏi thực sự mơ hồ."
 )
 
 
@@ -64,11 +69,16 @@ def _build_user_prompt(query: str, chunks: list[RetrievedChunk], history: list[d
     )
 
 
+class GeneratorError(Exception):
+    """Raised when the generator cannot produce an answer (e.g. vLLM down)."""
+    pass
+
+
 def generate(query: str, chunks: list[RetrievedChunk], history: list[dict] = None) -> str:
     """
     Generate an answer grounded in the provided chunks.
     Returns the answer text string.
-    If vLLM is unavailable, returns an error message.
+    Raises GeneratorError if vLLM is unavailable.
     """
     print(f"[GENERATOR] Context chunks: {len(chunks)}")
 
@@ -95,7 +105,7 @@ def generate(query: str, chunks: list[RetrievedChunk], history: list[dict] = Non
     except Exception as e:
         error_msg = f"[GENERATOR] vLLM unavailable ({type(e).__name__}: {e})"
         print(error_msg)
-        return "Lỗi: Không thể kết nối đến LLM server. Vui lòng thử lại sau."
+        raise GeneratorError(str(e)) from e
 
 
 if __name__ == "__main__":

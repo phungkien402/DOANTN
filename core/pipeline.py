@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import RETRIEVER_TOP_K, RERANKER_TOP_N, CONFIDENCE_THRESHOLD
 from core.models import Message, Answer
 from core import query_rewriter, retriever, reranker, generator, confidence, fallback
+from core.generator import GeneratorError
 
 
 def run(message: Message, session_history: list) -> Answer:
@@ -50,7 +51,11 @@ def run(message: Message, session_history: list) -> Answer:
         return fallback.handle(message, session_history)
 
     # Step 5: Generate grounded answer
-    answer_text = generator.generate(rewritten, ranked_chunks, session_history)
+    try:
+        answer_text = generator.generate(rewritten, ranked_chunks, session_history)
+    except GeneratorError:
+        print("[PIPELINE] Generator failed (vLLM unavailable) → fallback")
+        return fallback.handle(message, session_history)
 
     answer = Answer(
         text=answer_text,
