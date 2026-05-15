@@ -57,7 +57,8 @@ _processed_slack_events: set[str] = set()
 @app.get("/health")
 def health():
     """Health check endpoint."""
-    return {"status": "ok", "service": "ehc-helpdesk"}
+    from datetime import datetime, timezone
+    return {"status": "ok", "service": "ehc-helpdesk", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/")

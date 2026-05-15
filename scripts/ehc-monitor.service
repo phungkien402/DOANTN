@@ -1,0 +1,23 @@
+[Unit]
+Description=EHC Helpdesk Service Monitor
+After=network.target ehc-helpdesk.service ehc-vllm.service
+
+[Service]
+Type=simple
+User=phungkien
+WorkingDirectory=/home/phungkien/EHC_HELPDESK/ehc-helpdesk
+Environment="PATH=/home/phungkien/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Email alert configuration — fill in your values
+Environment="ALERT_EMAIL_FROM="
+Environment="ALERT_EMAIL_TO="
+Environment="ALERT_SMTP_HOST=smtp.gmail.com"
+Environment="ALERT_SMTP_PORT=587"
+Environment="ALERT_SMTP_PASSWORD="
+ExecStart=/usr/bin/python3 /home/phungkien/EHC_HELPDESK/ehc-helpdesk/scripts/monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
