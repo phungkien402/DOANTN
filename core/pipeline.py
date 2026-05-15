@@ -13,11 +13,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import RETRIEVER_TOP_K, RERANKER_TOP_N, CONFIDENCE_THRESHOLD
+from config import RETRIEVER_TOP_K, RERANKER_TOP_N, CONFIDENCE_THRESHOLD, MAINTENANCE_MODE
 from core.models import Message, Answer
 from core import query_rewriter, retriever, reranker, generator, confidence, fallback
 from core.query_rewriter import analyze_intent
 from core.generator import GeneratorError
+
+# --- Maintenance mode (toggled at runtime via /admin/maintenance) ---
+_maintenance_mode: bool = MAINTENANCE_MODE
+
+MAINTENANCE_MESSAGE = (
+    "⚙️ Hệ thống đang bảo trì, vui lòng thử lại sau ít phút. "
+    "Xin lỗi vì sự bất tiện này 🙏"
+)
+
+
+def set_maintenance_mode(enabled: bool):
+    """Toggle maintenance mode at runtime."""
+    global _maintenance_mode
+    _maintenance_mode = enabled
+    print(f"[PIPELINE] Maintenance mode: {'ON' if enabled else 'OFF'}")
+
+
+def is_maintenance_mode() -> bool:
+    """Check if maintenance mode is active."""
+    return _maintenance_mode
 
 
 def run(message: Message, session_history: list) -> Answer:
@@ -25,6 +45,17 @@ def run(message: Message, session_history: list) -> Answer:
     Execute the full RAG pipeline on a message.
     Returns an Answer (either generated or fallback).
     """
+    # Short-circuit if maintenance mode is active
+    if _maintenance_mode:
+        print(f"[PIPELINE] Maintenance mode active — returning maintenance message")
+        return Answer(
+            text=MAINTENANCE_MESSAGE,
+            confidence=0.0,
+            source_chunks=[],
+            is_fallback=True,
+            rewritten_question="",
+        )
+
     print(f"\n{'='*60}")
     print(f"[PIPELINE] Input: \"{message.text}\"")
     print(f"{'='*60}")

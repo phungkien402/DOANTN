@@ -18,9 +18,9 @@ from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import SESSION_MAX_TURNS
+from config import SESSION_MAX_TURNS, ADMIN_TOKEN
 from core.models import Message
-from core.pipeline import run as run_pipeline
+from core.pipeline import run as run_pipeline, set_maintenance_mode, is_maintenance_mode
 from api.session import SessionManager
 from api.logger import QueryLogger
 from adapters.telegram_adapter import TelegramAdapter
@@ -171,3 +171,32 @@ async def trigger_reindex(background_tasks: BackgroundTasks):
 
     background_tasks.add_task(full_reindex)
     return {"status": "reindex_started", "message": "Full reindex triggered in background."}
+
+
+@app.post("/admin/maintenance")
+async def toggle_maintenance(request: Request):
+    """Toggle maintenance mode at runtime. Requires ADMIN_TOKEN."""
+    # Auth check
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN not configured")
+
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip()
+    if token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(status_code=400, detail="Body must contain {\"enabled\": true/false}")
+
+    set_maintenance_mode(enabled)
+    return {
+        "status": "ok",
+        "maintenance_mode": is_maintenance_mode(),
+        "message": f"Maintenance mode {'enabled' if enabled else 'disabled'}.",
+    }

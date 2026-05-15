@@ -55,6 +55,10 @@ CONFIDENCE_THRESHOLD = float(_get("CONFIDENCE_THRESHOLD", "0.4"))
 # --- Session ---
 SESSION_MAX_TURNS = int(_get("SESSION_MAX_TURNS", "10"))
 
+# --- Maintenance ---
+MAINTENANCE_MODE = _get("MAINTENANCE_MODE", "false").lower() == "true"
+ADMIN_TOKEN = _get("ADMIN_TOKEN", "")
+
 # --- Telegram ---
 TELEGRAM_BOT_TOKEN = _get("TELEGRAM_BOT_TOKEN", "")
 
