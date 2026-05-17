@@ -126,38 +126,39 @@ def node_retriever(state: AgentState) -> dict:
     chunks, rewritten, user_intent, answerable = search_faq(query)
 
     print(f"[AGENT] Node: Retriever | rewritten=\"{rewritten}\" | answerable={answerable}")
+
+    # Route directly to clarifier if answerable=unclear/no (steps 3+4 were skipped)
+    next_intent = "clarify" if answerable in ("unclear", "no") else state.get("intent", "search_faq")
+
     return {
         "chunks": chunks,
         "rewritten_query": rewritten,
         "user_intent": user_intent,
         "answerable": answerable,
+        "intent": next_intent,
     }
 
 
 def node_synthesizer(state: AgentState) -> dict:
-    """Check confidence of retrieved chunks and decide next route."""
+    """Check rerank confidence of retrieved chunks and decide next route.
+
+    Only reached when answerable=yes (unclear/no are routed to clarifier earlier).
+    Uses rerank score as a secondary quality gate.
+    """
     chunks = state["chunks"]
-    answerable = state.get("answerable", "unclear")
     session_id = state.get("session_id", "")
 
-    if not chunks:
-        top_score = 0.0
-    else:
-        top_score = chunks[0].score
+    top_score = chunks[0].score if chunks else 0.0
 
-    print(f"[AGENT] Node: Synthesizer | answerable={answerable} confidence={top_score:.4f}")
+    is_confident = chunks and confidence.is_confident(chunks[0], threshold=CONFIDENCE_THRESHOLD)
 
-    # Primary: LLM judgment
-    if answerable == "yes" or (answerable == "unclear" and top_score >= CONFIDENCE_THRESHOLD):
-        print(f"[AGENT] Node: Synthesizer → CONFIDENT")
-        return {
-            "confidence": top_score,
-            "intent": "search_faq",
-        }
+    if is_confident:
+        print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → CONFIDENT")
+        return {"confidence": top_score, "intent": "search_faq"}
 
-    # Low: check clarification count
+    # Low rerank score despite answerable=yes — ask for clarification
     count = _session_mgr.get_clarification_count(session_id) if _session_mgr else 0
-    print(f"[AGENT] Node: Synthesizer → LOW | clarification_count={count}")
+    print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → LOW | clarification_count={count}")
     if count >= 3:
         return {"confidence": top_score, "intent": "create_ticket"}
     else:
@@ -289,8 +290,13 @@ graph.add_conditional_edges(
     }[s["intent"]]
 )
 
+# Retriever → conditional: clarifier (if answerable=unclear/no) or synthesizer
+graph.add_conditional_edges(
+    "retriever",
+    lambda s: "clarifier" if s.get("intent") == "clarify" else "synthesizer"
+)
+
 # Linear edges
-graph.add_edge("retriever", "synthesizer")
 graph.add_edge("generator", END)
 graph.add_edge("ticket_creator", END)
 graph.add_edge("chat_fallback", END)

@@ -21,8 +21,8 @@ def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None, str]:
     Execute the full RAG search pipeline:
       1. Fast retrieve (top 3, no rerank) for initial context
       2. Analyze + rewrite query (single LLM call)
-      3. Full retrieve (top K) with rewritten query
-      4. Rerank (top N)
+      3. Full retrieve (top K) with rewritten query  [skipped if answerable=unclear/no]
+      4. Rerank (top N)                              [skipped if answerable=unclear/no]
 
     Returns: (ranked_chunks, rewritten_query, user_intent, answerable)
     If vLLM is unavailable for rewrite, uses original query.
@@ -47,6 +47,11 @@ def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None, str]:
         print("[SEARCH_FAQ] vLLM unavailable for rewrite, using original query")
         rewritten = query
         answerable = "unclear"
+
+    # Early exit if LLM says unclear/no — skip expensive steps 3+4
+    if answerable in ("unclear", "no"):
+        print(f"[SEARCH_FAQ] answerable={answerable} → early exit, skipping full retrieve + rerank")
+        return [], rewritten, user_intent, answerable
 
     # Step 3: Full retrieve with rewritten query
     print(f"[SEARCH_FAQ] Step 3: Full retrieve (top {RETRIEVER_TOP_K})")
