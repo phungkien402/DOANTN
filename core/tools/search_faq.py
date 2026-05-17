@@ -16,7 +16,7 @@ from core.query_rewriter import analyze_and_rewrite
 from core.generator import LLMUnavailableError
 
 
-def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None, str, list[RetrievedChunk]]:
+def search_faq(query: str, session_history: list = None) -> tuple[list[RetrievedChunk], str, str | None, str, list[RetrievedChunk]]:
     """
     Execute the full RAG search pipeline:
       1. Fast retrieve (top 3, no rerank) for initial context
@@ -41,9 +41,13 @@ def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None, str, 
     answerable = "unclear"
     try:
         if fast_chunks:
-            user_intent, rewritten, answerable = analyze_and_rewrite(query, chunks=fast_chunks)
+            user_intent, rewritten, answerable = analyze_and_rewrite(
+                query, chunks=fast_chunks, session_history=session_history
+            )
         else:
-            user_intent, rewritten, answerable = analyze_and_rewrite(query)
+            user_intent, rewritten, answerable = analyze_and_rewrite(
+                query, session_history=session_history
+            )
     except LLMUnavailableError:
         print("[SEARCH_FAQ] vLLM unavailable for rewrite, using original query")
         rewritten = query

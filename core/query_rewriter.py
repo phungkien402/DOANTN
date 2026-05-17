@@ -227,17 +227,30 @@ def _parse_analyze_response(response_text: str, original_query: str) -> tuple[st
     return intent, rewritten, answerable
 
 
-def analyze_and_rewrite(query: str, chunks: list = None) -> tuple[str | None, str, str]:
+def analyze_and_rewrite(query: str, chunks: list = None, session_history: list = None) -> tuple[str | None, str, str]:
     """
     Combined intent analysis + query rewrite + answerability check in a single vLLM call.
     Returns (intent, rewritten_query, answerable).
 
     answerable is one of: "yes", "no", "unclear"
     If chunks are provided, injects them as context for grounded analysis.
+    If session_history is provided, injects recent turns so LLM can resolve
+    short follow-up replies (e.g. "2") in context.
     Graceful degradation: returns (None, original_query, "unclear") if vLLM is unavailable.
     """
     query = expand_abbreviations(query)
     print(f"[ANALYZE+REWRITE] Query: \"{query}\"")
+
+    # Build history block from recent conversation turns (last 2 exchanges = 4 messages)
+    history_block = ""
+    if session_history:
+        recent = session_history[-4:]
+        lines = []
+        for turn in recent:
+            role = "Người dùng" if turn["role"] == "user" else "Trợ lý"
+            lines.append(f"{role}: {turn['text']}")
+        history_block = "Lịch sử hội thoại:\n" + "\n".join(lines) + "\n\n"
+        print(f"[ANALYZE+REWRITE] Injecting {len(recent)} history turns")
 
     # Build user content with optional chunk context
     if chunks:
@@ -248,10 +261,10 @@ def analyze_and_rewrite(query: str, chunks: list = None) -> tuple[str | None, st
             text = c.text or c.metadata.get("description", "")
             chunk_texts.append(f"{i}. {subject}: {text}")
         context_block = "\n".join(chunk_texts)
-        user_content = f"Tài liệu tham khảo:\n{context_block}\n\nCâu hỏi: {query}"
+        user_content = f"{history_block}Tài liệu tham khảo:\n{context_block}\n\nCâu hỏi: {query}"
     else:
         print(f"[ANALYZE+REWRITE] No chunks (blind mode)")
-        user_content = f"Câu hỏi: {query}"
+        user_content = f"{history_block}Câu hỏi: {query}"
 
     messages = [
         {"role": "system", "content": ANALYZE_AND_REWRITE_PROMPT},

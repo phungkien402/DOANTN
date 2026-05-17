@@ -137,9 +137,12 @@ def node_tool_router(state: AgentState) -> dict:
 def node_retriever(state: AgentState) -> dict:
     """Execute the full RAG search pipeline."""
     query = state["query"]
+    session_history = state.get("session_history", [])
     print(f"[AGENT] Node: Retriever | query=\"{query}\"")
 
-    chunks, rewritten, user_intent, answerable, fast_chunks = search_faq(query)
+    chunks, rewritten, user_intent, answerable, fast_chunks = search_faq(
+        query, session_history=session_history
+    )
 
     print(f"[AGENT] Node: Retriever | rewritten=\"{rewritten}\" | answerable={answerable}")
 
