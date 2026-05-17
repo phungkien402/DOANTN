@@ -21,12 +21,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from langgraph.graph import StateGraph, END
 
-from config import CONFIDENCE_THRESHOLD, MAINTENANCE_MODE
+from openai import OpenAI
+from config import CONFIDENCE_THRESHOLD, MAINTENANCE_MODE, VLLM_BASE_URL, VLLM_MODEL
 from core.models import Message, Answer, RetrievedChunk
 from core.intent_guard import classify, chat_fallback
 from core.tools.search_faq import search_faq
 from core.tools.create_ticket import save_ticket
 from core import generator, confidence
+
+# Module-level vLLM client for clarifier
+_client = OpenAI(base_url=f"{VLLM_BASE_URL}/v1", api_key="not-needed")
 
 
 # --- Session manager injection (set from api/routes.py to avoid circular imports) ---
@@ -51,6 +55,7 @@ class AgentState(TypedDict):
     rewritten_query: str
     tool_called: str              # actual tool that ran
     chunks: list                  # list of RetrievedChunk
+    fast_chunks: list             # top 3 chunks from step 1, used by clarifier
     confidence: float
     answer: str
     ticket_id: Optional[int]
@@ -123,7 +128,7 @@ def node_retriever(state: AgentState) -> dict:
     query = state["query"]
     print(f"[AGENT] Node: Retriever | query=\"{query}\"")
 
-    chunks, rewritten, user_intent, answerable = search_faq(query)
+    chunks, rewritten, user_intent, answerable, fast_chunks = search_faq(query)
 
     print(f"[AGENT] Node: Retriever | rewritten=\"{rewritten}\" | answerable={answerable}")
 
@@ -135,6 +140,7 @@ def node_retriever(state: AgentState) -> dict:
         "rewritten_query": rewritten,
         "user_intent": user_intent,
         "answerable": answerable,
+        "fast_chunks": fast_chunks,
         "intent": next_intent,
     }
 
@@ -230,29 +236,71 @@ def node_chat_fallback(state: AgentState) -> dict:
     return {"answer": answer}
 
 
-def node_clarifier(state: AgentState) -> dict:
-    """Ask user for more detail (no LLM call — template only)."""
-    session_id = state.get("session_id", "")
-    user_intent = state.get("user_intent") or state["query"]
+CLARIFIER_PROMPT = (
+    "Bạn là trợ lý hỗ trợ phần mềm EHC. "
+    "Người dùng hỏi một câu chưa rõ ràng. "
+    "Dựa vào câu hỏi và danh sách vấn đề liên quan bên dưới, "
+    "hãy hỏi lại người dùng bằng cách đưa ra các lựa chọn cụ thể (dạng danh sách đánh số). "
+    "Giọng thân thiện, ngắn gọn. Không giải thích thêm. "
+    "Kết thúc bằng: 'Bạn đang gặp vấn đề nào trong các trường hợp trên?'"
+)
 
+
+def node_clarifier(state: AgentState) -> dict:
+    """Ask user for more detail using LLM + fast_chunks choices."""
+    session_id = state.get("session_id", "")
+    query = state["query"]
+    fast_chunks = state.get("fast_chunks", [])
     count = _session_mgr.increment_clarification(session_id) if _session_mgr else 1
 
-    print(f"[AGENT] Node: Clarifier | count={count}")
+    print(f"[AGENT] Node: Clarifier | count={count} | chunks={len(fast_chunks)}")
 
-    if count == 1:
-        answer = (
-            f"Mình chưa tìm được thông tin phù hợp về: \"{user_intent}\".\n"
-            "Bạn có thể mô tả chi tiết hơn không? "
-            "Ví dụ: lỗi xảy ra ở module nào, màn hình hiển thị thông báo gì?"
+    if fast_chunks and _client is not None:
+        # Build choice list from fast_chunks subjects
+        choices = "\n".join(
+            f"{i}. {c.metadata.get('subject', c.text[:60])}"
+            for i, c in enumerate(fast_chunks, 1)
         )
+        user_content = f"Câu hỏi của người dùng: \"{query}\"\n\nCác vấn đề liên quan:\n{choices}"
+
+        try:
+            response = _client.chat.completions.create(
+                model=VLLM_MODEL,
+                messages=[
+                    {"role": "system", "content": CLARIFIER_PROMPT},
+                    {"role": "user", "content": user_content},
+                ],
+                max_tokens=200,
+                temperature=0.2,
+            )
+            answer = response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"[AGENT] Clarifier LLM failed: {e}, using fallback template")
+            answer = _clarifier_fallback(query, fast_chunks, count)
     else:
-        answer = (
-            "Mình vẫn chưa tìm được câu trả lời phù hợp. "
-            "Bạn có thể cung cấp thêm thông tin không? "
-            "Ví dụ: tên chức năng đang dùng, các bước đã thực hiện trước khi gặp lỗi."
-        )
+        answer = _clarifier_fallback(query, fast_chunks, count)
 
+    print(f"[AGENT] Node: Clarifier | answer=\"{answer[:80]}...\"")
     return {"answer": answer, "tool_called": "clarifier"}
+
+
+def _clarifier_fallback(query: str, fast_chunks: list, count: int) -> str:
+    """Template fallback if LLM unavailable."""
+    if fast_chunks:
+        choices = "\n".join(
+            f"{i}. {c.metadata.get('subject', c.text[:60])}"
+            for i, c in enumerate(fast_chunks, 1)
+        )
+        return (
+            f"Mình chưa xác định rõ vấn đề của bạn. "
+            f"Bạn đang gặp vấn đề nào trong các trường hợp sau?\n{choices}\n\n"
+            "Bạn đang gặp vấn đề nào trong các trường hợp trên?"
+        )
+    return (
+        "Mình chưa tìm được thông tin phù hợp. "
+        "Bạn có thể mô tả chi tiết hơn không? "
+        "Ví dụ: lỗi xảy ra ở module nào, màn hình hiển thị thông báo gì?"
+    )
 
 
 # --- Graph wiring ---
@@ -336,6 +384,7 @@ def run(message: Message, session_history: list) -> Answer:
         "rewritten_query": "",
         "tool_called": "",
         "chunks": [],
+        "fast_chunks": [],
         "confidence": 0.0,
         "answer": "",
         "ticket_id": None,
