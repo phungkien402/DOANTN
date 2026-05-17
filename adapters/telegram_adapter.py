@@ -6,6 +6,7 @@ Handles:
   - Formatting responses (plain text, Telegram supports basic markdown but
     we keep it simple to avoid escaping issues)
   - Sending messages via the Telegram Bot API
+  - /clear command: clears session history for the current user
 
 Run standalone: python -m adapters.telegram_adapter
 """
@@ -23,6 +24,18 @@ from core.models import Message
 from config import TELEGRAM_BOT_TOKEN
 
 
+# --- Session manager injection (set from api/routes.py) ---
+
+_session_mgr = None
+
+
+def set_session_manager(mgr):
+    """Inject the SessionManager instance from api/routes.py."""
+    global _session_mgr
+    _session_mgr = mgr
+    print("[TELEGRAM] SessionManager injected")
+
+
 class TelegramAdapter(BaseAdapter):
 
     def __init__(self):
@@ -32,6 +45,7 @@ class TelegramAdapter(BaseAdapter):
         """
         Parse a Telegram Update object. Only handles text messages.
         Returns None for non-text updates (photos, stickers, edits, etc.)
+        Also returns None for /clear command (handled internally).
         """
         msg_data = raw.get("message")
         if not msg_data:
@@ -48,6 +62,15 @@ class TelegramAdapter(BaseAdapter):
         if not user_id:
             return None
 
+        # Handle /clear command — clear session and reply immediately
+        if text.strip() == "/clear":
+            session_id = f"tg_{chat_id}"
+            if _session_mgr:
+                _session_mgr.clear(session_id)
+                print(f"[TELEGRAM] /clear: session {session_id} cleared")
+            self._send_clear_reply(chat_id)
+            return None  # skip pipeline
+
         return Message(
             user_id=user_id,
             session_id=f"tg_{chat_id}",
@@ -55,6 +78,28 @@ class TelegramAdapter(BaseAdapter):
             timestamp=float(ts),
             platform="telegram",
         )
+
+    def _send_clear_reply(self, chat_id: str) -> None:
+        """Send /clear confirmation synchronously (immediate feedback)."""
+        if not TELEGRAM_BOT_TOKEN:
+            print("[TELEGRAM] No bot token configured, skipping /clear reply")
+            return
+
+        url = f"{self._api_base}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": "✅ Đã xoá lịch sử chat.",
+        }
+
+        try:
+            with httpx.Client(timeout=10) as client:
+                resp = client.post(url, json=payload)
+                if resp.status_code != 200:
+                    print(f"[TELEGRAM] /clear reply failed: {resp.status_code} {resp.text}")
+                else:
+                    print(f"[TELEGRAM] /clear reply sent to {chat_id}")
+        except Exception as e:
+            print(f"[TELEGRAM] /clear reply error: {e}")
 
     def format_response(self, answer_text: str, confidence: float) -> str:
         """Format response for Telegram — plain text with confidence footer."""
@@ -105,4 +150,8 @@ if __name__ == "__main__":
     # Test ignore non-text
     non_text = {"message": {"from": {"id": 123}, "chat": {"id": 123}, "photo": []}}
     assert adapter.parse_message(non_text) is None
+
+    # Test /clear returns None
+    clear_msg = {"message": {"from": {"id": 123}, "chat": {"id": 123}, "date": 1700000000, "text": "/clear"}}
+    assert adapter.parse_message(clear_msg) is None
     print("\n✓ TelegramAdapter works correctly.")
