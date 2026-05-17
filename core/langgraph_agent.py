@@ -173,9 +173,10 @@ def node_generator(state: AgentState) -> dict:
 def node_ticket_creator(state: AgentState) -> dict:
     """Create a ticket for low-confidence queries."""
     query = state["query"]
+    user_intent = state.get("user_intent")
     print(f"[AGENT] Node: TicketCreator | query=\"{query}\"")
 
-    ticket_id = save_ticket(query)
+    ticket_id = save_ticket(query, user_intent=user_intent)
     answer = f"Đã ghi nhận sự cố, mã ticket: #{ticket_id}"
 
     print(f"[AGENT] Node: TicketCreator | ticket_id={ticket_id}")
