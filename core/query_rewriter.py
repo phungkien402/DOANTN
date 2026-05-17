@@ -200,7 +200,9 @@ ANALYZE_AND_REWRITE_PROMPT = (
     "Hướng dẫn cho ANSWERABLE:\n"
     "- yes: tài liệu tham khảo trả lời trực tiếp câu hỏi\n"
     "- unclear: câu hỏi quá mơ hồ, thiếu thông tin (module nào? lỗi gì?), hoặc tài liệu chỉ liên quan một phần\n"
-    "- no: tài liệu hoàn toàn không liên quan, hoặc không có tài liệu tham khảo"
+    "- no: tài liệu hoàn toàn không liên quan, hoặc không có tài liệu tham khảo\n\n"
+    "Nếu không có tài liệu tham khảo nhưng lịch sử hội thoại đã có danh sách đánh số, "
+    "hãy dùng lịch sử đó để xác định intent. ANSWERABLE=yes nếu intent đã rõ từ lịch sử."
 )
 
 

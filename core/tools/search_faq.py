@@ -40,14 +40,17 @@ def search_faq(query: str, session_history: list = None, saved_fast_chunks: list
         fast_chunks = retriever.retrieve(query, top_k=3)
 
     # Step 2: Analyze + rewrite
+    # When saved_fast_chunks is provided (clarification loop), pass chunks=[] so
+    # the LLM relies on session_history (which contains the numbered choices) to resolve intent.
     print(f"[SEARCH_FAQ] Step 2: Analyze + Rewrite")
     user_intent = None
     rewritten = query
     answerable = "unclear"
+    chunks_for_analysis = [] if saved_fast_chunks else fast_chunks
     try:
-        if fast_chunks:
+        if chunks_for_analysis:
             user_intent, rewritten, answerable = analyze_and_rewrite(
-                query, chunks=fast_chunks, session_history=session_history
+                query, chunks=chunks_for_analysis, session_history=session_history
             )
         else:
             user_intent, rewritten, answerable = analyze_and_rewrite(
