@@ -1,0 +1,1229 @@
+nohup: ignoring input
+============================================================
+  EHC bge-m3 Fine-tuning Script
+============================================================
+
+============================================================
+[STEP 1] Generating training data from FAQs
+============================================================
+[GENERATE] Connecting to Qdrant at http://localhost:6333
+[GENERATE] Collection 'ehc_faq' has 472 points
+[GENERATE] Fetched 472 FAQs
+[GENERATE] vLLM connected at http://localhost:8000
+  [1/472] Kiosk bị lỗi màn hình đen
+  [WARN] Filtered 2 question(s) with Chinese characters for 'Kiosk bị lỗi màn hình đen'
+    → SKIPPED (no questions generated)
+  [2/472] Bác sĩ không kê được đơn thuốc
+    → 3 questions generated
+  [3/472] Máy xét nghiệm không đổ kết quả
+    → 1 questions generated
+  [4/472] Không chạy được phần mềm
+    → 3 questions generated
+  [5/472] Cài đặt phần mềm như thế nào
+    → 3 questions generated
+  [6/472] Lỗi cập nhật thông tin viện phí khi chuyển đối tượng bệnh nhân
+    → 3 questions generated
+  [7/472] Không hiển thị form ký số phiếu chăm sóc
+    → 3 questions generated
+  [8/472] Không in được bảng kê 6556
+    → 1 questions generated
+  [9/472] Không hiển thị nút xuất kho tại kho nội trú
+    → 3 questions generated
+  [10/472] Không tạo được phiếu tạm ứng,thu tiền ...
+    → 3 questions generated
+  [11/472] In phiếu không lên form view
+    → 3 questions generated
+  [12/472] Tại sao Bn không nhập viện được
+    → 3 questions generated
+  [13/472] Không xoá được phiếu đã chỉ định
+    → 3 questions generated
+  [14/472] Lỗi không tổng hợp được đơn thuốc treo
+    → 4 questions generated
+  [15/472] Lỗi form in bị đen
+    → 3 questions generated
+  [16/472] Lỗi bệnh án đã đóng khi mở lại bệnh án để sửa thông tin
+    → 3 questions generated
+  [17/472] Tại sao phần mềm lại báo phải update mới cho vào?
+    → 3 questions generated
+  [18/472] Tại sao không lưu được thông tin PTTT
+    → 3 questions generated
+  [19/472] Khi xử trí cứ xoay đang xử lý mãi không ngừng
+    → 4 questions generated
+  [20/472] tại sao bệnh nhân không xử trí ra viện được
+    → 3 questions generated
+  [21/472] Tại sao xóa phiếu đièu trị lại không xóa được?
+    → 3 questions generated
+  [22/472] Tại sao quét/ nhập bảo hiểm y tế rồi mà nó cứ xoay mãi?
+    → 4 questions generated
+  [23/472] Muốn cho BN điều trị ngoại trú thì như thế nào
+    → 3 questions generated
+  [24/472] muốn in lại giấy ra viện thì in ở đâu
+    → 1 questions generated
+  [25/472] Cần sửa thông tin khi bn đã xử trí ra viện
+    → 5 questions generated
+  [26/472] Muốn hủy nhập viện thì bấn vào đâu
+  [WARN] Filtered 1 question(s) with Chinese characters for 'Muốn hủy nhập viện thì bấn vào đâu'
+    → 1 questions generated
+  [27/472] Muốn sửa hoặc xóa thuốc, vật tư khi đã chỉ định
+    → 3 questions generated
+  [28/472] Cần sửa ngày thực hiện và ngày trả kết quả của dịch vụ
+    → 3 questions generated
+  [29/472] Muốn chọn hủy dịch vụ không làm
+    → 3 questions generated
+  [30/472] Tại sao khi ấn in vỏ bệnh án mà trắng xóa không thấy có nội dung nào hiện lên
+    → 3 questions generated
+  [31/472] Cách bỏ 1 dịch vụ xét nghiệm trong một phiếu dịch vụ xét nghiệm có nhiều dịch vụ xét nghiệm và đã có kết quả và dịch vụ muốn bỏ đang thực hiện
+    → 3 questions generated
+  [32/472] Cách bỏ 1 dịch vụ xét nghiệm trong một phiếu chỉ định dịch vụ có nhiều dịch vụ khác nhau và đã có kết quả và dịch vụ muốn bỏ đang thực hiện
+    → 3 questions generated
+  [33/472] cách sửa giờ vào viện sau khi đã xử tri và chưa cho nhập viện bên hành chính
+    → 3 questions generated
+  [34/472] cách mở một tài liệu tùy biến bất kì với bệnh nhân nội trú và ngoại trú
+    → 3 questions generated
+  [35/472] cách sửa đổi thông tin bệnh nhân nội trú hoặc ngoại trú sau khi nhập viện hoặc đang khám bệnh
+    → 3 questions generated
+  [36/472] Tại sao không ký được vị trí trưởng khoa vỏ bệnh án
+  [RETRY 1/3] Tại sao không ký được vị trí trưởng khoa vỏ bệnh án
+  [RETRY 2/3] Tại sao không ký được vị trí trưởng khoa vỏ bệnh án
+  [WARN] Generation failed after 3 retries for 'Tại sao không ký được vị trí trưởng khoa vỏ bệnh án': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [37/472] Muốn hủy đơn thuốc đã xuất kho
+  [RETRY 1/3] Muốn hủy đơn thuốc đã xuất kho
+  [RETRY 2/3] Muốn hủy đơn thuốc đã xuất kho
+  [WARN] Generation failed after 3 retries for 'Muốn hủy đơn thuốc đã xuất kho': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [38/472] Tại sao bắt đầu lấy mẫu báo lỗi
+  [RETRY 1/3] Tại sao bắt đầu lấy mẫu báo lỗi
+  [RETRY 2/3] Tại sao bắt đầu lấy mẫu báo lỗi
+  [WARN] Generation failed after 3 retries for 'Tại sao bắt đầu lấy mẫu báo lỗi': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [39/472] Tại sao xử trí bị treo lâu
+  [RETRY 1/3] Tại sao xử trí bị treo lâu
+  [RETRY 2/3] Tại sao xử trí bị treo lâu
+  [WARN] Generation failed after 3 retries for 'Tại sao xử trí bị treo lâu': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [40/472] Tại sao cùng 1 loại dịch vụ XN Test nhanh mà dịch vụ A in được mẫu kết quả ra form ký còn dịch vụ B in ra form không ký số
+  [RETRY 1/3] Tại sao cùng 1 loại dịch vụ XN Test nhanh mà dịch vụ A in được mẫu kết quả ra form ký còn dịch vụ B in ra form không ký số
+  [RETRY 2/3] Tại sao cùng 1 loại dịch vụ XN Test nhanh mà dịch vụ A in được mẫu kết quả ra form ký còn dịch vụ B in ra form không ký số
+  [WARN] Generation failed after 3 retries for 'Tại sao cùng 1 loại dịch vụ XN Test nhanh mà dịch vụ A in được mẫu kết quả ra form ký còn dịch vụ B in ra form không ký số': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [41/472] Muốn thêm chữ ký user vào phần mềm thì làm như nào
+  [RETRY 1/3] Muốn thêm chữ ký user vào phần mềm thì làm như nào
+  [RETRY 2/3] Muốn thêm chữ ký user vào phần mềm thì làm như nào
+  [WARN] Generation failed after 3 retries for 'Muốn thêm chữ ký user vào phần mềm thì làm như nào': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [42/472] Tại sao khi thực hiện trả kết XN , CĐHA lại báo thời gian thực hiện đang lớn hơn thời gian ra viện
+  [RETRY 1/3] Tại sao khi thực hiện trả kết XN , CĐHA lại báo thời gian thực hiện đang lớn hơn thời gian ra viện
+  [RETRY 2/3] Tại sao khi thực hiện trả kết XN , CĐHA lại báo thời gian thực hiện đang lớn hơn thời gian ra viện
+    → 3 questions generated
+  [43/472] Tại sao khi bác sĩ mở bệnh án để thực hiện dịch vụ lại báo lỗi lớn hơn thời gian ra viện
+    → 3 questions generated
+  [44/472] Địa chỉ trên giấy ra viện bị sai
+    → 3 questions generated
+  [45/472] Muốn sửa liều dùng thuốc thì làm thế nào
+    → 3 questions generated
+  [46/472] Tại sao bấm in mà không thấy giấy ra
+    → 3 questions generated
+  [47/472] Cách xóa bệnh nhân đã có phiếu thu/tạm ứng/hoàn ứng
+    → 3 questions generated
+  [48/472] Muốn hủy khám kết hợp
+    → 4 questions generated
+  [49/472] Không mở được kết nối máy xét nghiệm
+    → 3 questions generated
+  [50/472] Cách kê vật tư đi kèm CDHA
+    → 3 questions generated
+  [51/472] Thay thế dịch vụ PTTT đã nhập thông tin
+    → 3 questions generated
+  [52/472] Chuyển thuốc sang hao phí PTTT
+    → 3 questions generated
+  [53/472] Muốn xóa dịch vụ XN đã trả kết quả
+    → 3 questions generated
+  [54/472] Dịch vụ CDHA đã kết thúc nhưng xử trí phần mềm báo đang thực hiện
+    → 3 questions generated
+  [55/472] Máy trạm mở phần mềm báo lỗi E3
+    → 3 questions generated
+  [56/472] Tại sao kho thuốc ngoại trú không tìm thấy phiếu thuốc của bệnh nhân trên phần mềm
+    → 3 questions generated
+  [57/472] Tại sao khi in phiếu chỉ định ,phiếu trả kêt quả bằng khổ a5 bị lỗi form
+  [WARN] Filtered 4 question(s) with Chinese characters for 'Tại sao khi in phiếu chỉ định ,phiếu trả kêt quả bằng khổ a5 bị lỗi form'
+    → SKIPPED (no questions generated)
+  [58/472] Các thay thế dịch vụ kỹ thuật khi chưa thanh toán trong khám bệnh
+    → 3 questions generated
+  [59/472] Không xoá/sửa phiếu điều trị được
+    → 3 questions generated
+  [60/472] Tại sao khi chỉ định dịch vụ 2 lần khác nhau lại sinh ra 2 mã barcode khác nhau
+    → 3 questions generated
+  [61/472] Không huỷ/sửa/xoá được các phiếu chỉ định
+    → 3 questions generated
+  [62/472] Sửa thời gian vào/ra viện
+    → 3 questions generated
+  [63/472] Cách đổi đối tượng từ Viện phí qua bảo hiểm và ngược lại
+    → 3 questions generated
+  [64/472] Thuốc kháng sinh lên phiếu điều trị không được đánh số thứ tự
+    → 3 questions generated
+  [65/472] Bác sĩ lên thuốc dịch truyền không tự động tạo phiếu truyền dịch
+    → 3 questions generated
+  [66/472] Chỉ định dịch vụ phần mềm báo phòng thực hiện chưa được cấu hình
+    → 3 questions generated
+  [67/472] Không tìm thấy bệnh nhân trong phòng Đón tiếp cận lâm sàng
+    → 3 questions generated
+  [68/472] Nhập bù cơ số tủ trực
+    → 3 questions generated
+  [69/472] Không lên tiếng khi gọi BN vào khám
+    → 4 questions generated
+  [70/472] Không hiện bệnh kèm theo khi chọn cập nhật trong xử trí
+    → 3 questions generated
+  [71/472] Sao khi đặt hẹn và in giấy hẹn lại chưa có mã bệnh
+    → 3 questions generated
+  [72/472] Cách setup sẵn ekip cdha
+    → 3 questions generated
+  [73/472] sửa chuẩn đoán của phiếu chỉ định dịch vụ xét nghiệm,cdha khi bs chỉ định xong dịch vụ mới sửa chẩn đoán
+    → 3 questions generated
+  [74/472] Chuyển loại pttt để giảm chi phí khi chung 1 kíp mổ nhưng thực hiện 2 dvu pttt
+    → 3 questions generated
+  [75/472] Khi bệnh nhân nhập khoa một số giường bệnh đã được tạo từ trước nhưng không hiển thị để chọn
+    → 3 questions generated
+  [76/472] Tại sao không nhận được thuốc bù tủ trực
+    → 2 questions generated
+  [77/472] Cách hẹn ngày khám cho bệnh nhân
+    → 4 questions generated
+  [78/472] Sao BN khi xuống nhà thuốc nhận thuốc ngoại trú lại không thấy thuốc
+    → 4 questions generated
+  [79/472] Cách đổi loại Bệnh án cho BN
+    → 3 questions generated
+  [80/472] Bệnh nhân có phiếu chỉ định nhưng không thấy ở phòng thực hiện
+    → 2 questions generated
+  [81/472] Không lưu được chỉ định dịch vụ, hiện mãi đang xử lý
+    → 5 questions generated
+  [82/472] Tại sao khi nhập viện không chọn được phòng, buồng điều trị
+    → 3 questions generated
+  [83/472] Cách xóa mẫu chỉ định xét nghiệm
+    → 3 questions generated
+  [84/472] Xem mẫu phiếu cam đoan phẫu thuật thủ thật trước khi điền
+    → 3 questions generated
+  [85/472] Cách chỉ định bệnh nhân khám kết hợp
+    → 3 questions generated
+  [86/472] Tại sao không tìm thấy tên bệnh nhân
+  [RETRY 1/3] Tại sao không tìm thấy tên bệnh nhân
+  [RETRY 2/3] Tại sao không tìm thấy tên bệnh nhân
+  [WARN] Generation failed after 3 retries for 'Tại sao không tìm thấy tên bệnh nhân': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [87/472] Tại sao không tìm thấy tên bệnh nhân trong module xét nghiệm
+  [RETRY 1/3] Tại sao không tìm thấy tên bệnh nhân trong module xét nghiệm
+  [RETRY 2/3] Tại sao không tìm thấy tên bệnh nhân trong module xét nghiệm
+  [WARN] Generation failed after 3 retries for 'Tại sao không tìm thấy tên bệnh nhân trong module xét nghiệm': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [88/472] tại sao không kê được nhiều hơn 1 túi máu
+  [RETRY 1/3] tại sao không kê được nhiều hơn 1 túi máu
+  [RETRY 2/3] tại sao không kê được nhiều hơn 1 túi máu
+  [WARN] Generation failed after 3 retries for 'tại sao không kê được nhiều hơn 1 túi máu': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [89/472] Muốn in sổ khám bệnh ở đâu?
+  [RETRY 1/3] Muốn in sổ khám bệnh ở đâu?
+  [RETRY 2/3] Muốn in sổ khám bệnh ở đâu?
+  [WARN] Generation failed after 3 retries for 'Muốn in sổ khám bệnh ở đâu?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [90/472] Tại sao không hủy được tài liệu
+  [RETRY 1/3] Tại sao không hủy được tài liệu
+  [RETRY 2/3] Tại sao không hủy được tài liệu
+  [WARN] Generation failed after 3 retries for 'Tại sao không hủy được tài liệu': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [91/472] cách thêm biểu đồ tim thai
+  [RETRY 1/3] cách thêm biểu đồ tim thai
+  [RETRY 2/3] cách thêm biểu đồ tim thai
+  [WARN] Generation failed after 3 retries for 'cách thêm biểu đồ tim thai': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [92/472] Muốn lưu ảnh nội soi về máy
+  [RETRY 1/3] Muốn lưu ảnh nội soi về máy
+  [RETRY 2/3] Muốn lưu ảnh nội soi về máy
+    → 3 questions generated
+  [93/472] Kiểm kê kho như nào?
+    → 4 questions generated
+  [94/472] Tại sao bị ẩn nút Thêm tài liệu tùy biến/Scan
+    → 3 questions generated
+  [95/472] Thay thế dịch vụ công khám như thế nào?
+    → 3 questions generated
+  [96/472] Làm sao lấy danh sách bệnh nhân theo dịch vụ
+    → 3 questions generated
+  [97/472] Cấu hình thuốc/ vật tư hao phí, đi kèm tự động ở đâu?
+    → 3 questions generated
+  [98/472] Tại sao không chọn được kho thuốc khi xuất chuyển kho
+    → 3 questions generated
+  [99/472] Cấu hình máy xét nghiệm vitek2 không hiện danh sách vi sinh/ kháng sinh
+    → 3 questions generated
+  [100/472] Tạo giấy nghỉ ôm ( nghỉ hưởng BHXH) ở đâu?
+    → 3 questions generated
+  [101/472] Cách chuyển loại bệnh án
+    → 3 questions generated
+  [102/472] Sao nút lưu bị mờ khi cập nhật dịch vụ trong danh sách dịch vụ kỹ thuật?
+  [WARN] Filtered 5 question(s) with Chinese characters for 'Sao nút lưu bị mờ khi cập nhật dịch vụ trong danh sách dịch vụ kỹ thuật?'
+    → SKIPPED (no questions generated)
+  [103/472] Chuyển dịch vụ phẫu thuật thủ thuật phụ có thay kíp/ không thay kíp mổ ở đâu?
+    → 3 questions generated
+  [104/472] Nhập thông tin ngày vào, ngày ra của dịch vụ giường ở đâu
+    → 4 questions generated
+  [105/472] Đặt lịch hẹn, đặt hẹn tái khám ở đâu?
+    → 4 questions generated
+  [106/472] Tại sao không thấy tài khoản xuất hiện trong danh sách chọn ekip PTTT?
+    → 1 questions generated
+  [107/472] Xuất thuốc cho BN ngoại trú
+    → 4 questions generated
+  [108/472] Lấy danh sách bệnh nhân nội trú ở đâu
+    → 3 questions generated
+  [109/472] Tại sao đã kê thuốc rồi mà khi tổng hợp không thấy
+    → 3 questions generated
+  [110/472] Cách đặt lịch hẹn tái khám cho bệnh nhân
+    → 4 questions generated
+  [111/472] Cách thêm một dich vụ xét nghiệm mới
+    → 4 questions generated
+  [112/472] Cách xóa bệnh nhân không khám bệnh nữa
+    → 3 questions generated
+  [113/472] Cách thay đổi thông tin thuốc trong danh mục thuốc
+    → 1 questions generated
+  [114/472] Xuất thuốc cho BN nội trú
+    → 4 questions generated
+  [115/472] sửa lỗi cảnh báo ngày giường
+    → 3 questions generated
+  [116/472] Tại sao đơn thuốc bệnh nhân cầm đơn thuốc đến kho ngoại trú . Người quản lý lại không nhìn thấy đơn trên phần mềm
+    → 3 questions generated
+  [117/472] Thay vì nhập thông bệnh nhanh cũ có cách nào để lấy thông tin nhanh hơn
+    → 3 questions generated
+  [118/472] Tại sao không tìm thấy dịch vụ để chỉ định
+    → 3 questions generated
+  [119/472] Sửa đối tượng dịch vụ các loại dịch vụ/thuốc/vật tư
+    → 4 questions generated
+  [120/472] Phần mềm bị co lại ,cỡ chữ nhỏ, không hiện thị đầy đủ
+    → 3 questions generated
+  [121/472] Muốn xóa dịch vụ chuyên khoa do bác sĩ tích nhầm
+    → 3 questions generated
+  [122/472] Tại sao lên thuốc nhóm dịch truyền phần mềm không tự tạo phiếu truyền dịch
+    → 3 questions generated
+  [123/472] ADD chữ ký user
+    → 3 questions generated
+  [124/472] Xem danh sách bệnh nhân nội soi Cổ tử cung ở đâu?
+    → 3 questions generated
+  [125/472] Xem thống kê bệnh nhân ở đâu
+    → 3 questions generated
+  [126/472] Xoá 1 bệnh nhân vừa đăng ký đón tiếp
+    → 3 questions generated
+  [127/472] Dịch vụ đã có kết quả nhưng xử trí báo lỗi chưa trả kết quả
+    → 3 questions generated
+  [128/472] Báo cáo mở rộng là gì
+    → 3 questions generated
+  [129/472] Tổ hợp phím đăng xuất tài khoản đăng nhập
+    → 3 questions generated
+  [130/472] Tại sao không cập nhật được phần mềm
+    → 3 questions generated
+  [131/472] Muốn xem các máy trạm có cập nhật được hay không thì xem ở đâu
+    → 3 questions generated
+  [132/472] Cập nhật phần mềm thủ công
+    → 3 questions generated
+  [133/472] Chuyển đối tượng BN từ Viện Phí thành BHYT
+    → 3 questions generated
+  [134/472] Bệnh nhân nhập khoa GMHS nhưng không đánh được phiếu phẫu thuât
+    → 4 questions generated
+  [135/472] Muốn tìm được nhiều đợt điều trị thì làm như thế nào
+  [RETRY 1/3] Muốn tìm được nhiều đợt điều trị thì làm như thế nào
+  [RETRY 2/3] Muốn tìm được nhiều đợt điều trị thì làm như thế nào
+  [WARN] Generation failed after 3 retries for 'Muốn tìm được nhiều đợt điều trị thì làm như thế nào': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [136/472] Không tìm thấy tên khi cập nhật E-kip thực hiện CLS
+  [RETRY 1/3] Không tìm thấy tên khi cập nhật E-kip thực hiện CLS
+  [RETRY 2/3] Không tìm thấy tên khi cập nhật E-kip thực hiện CLS
+  [WARN] Generation failed after 3 retries for 'Không tìm thấy tên khi cập nhật E-kip thực hiện CLS': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [137/472] Đổi dịch vụ chuyên khoa đã chỉ định
+  [RETRY 1/3] Đổi dịch vụ chuyên khoa đã chỉ định
+  [RETRY 2/3] Đổi dịch vụ chuyên khoa đã chỉ định
+  [WARN] Generation failed after 3 retries for 'Đổi dịch vụ chuyên khoa đã chỉ định': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [138/472] Thêm bệnh kèm theo ở đơn thuốc sau khi đã chỉ định
+  [RETRY 1/3] Thêm bệnh kèm theo ở đơn thuốc sau khi đã chỉ định
+  [RETRY 2/3] Thêm bệnh kèm theo ở đơn thuốc sau khi đã chỉ định
+  [WARN] Generation failed after 3 retries for 'Thêm bệnh kèm theo ở đơn thuốc sau khi đã chỉ định': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [139/472] Chuyển đối tượng bệnh nhân từ bảo hiểm sang viện phí và ngược lại
+  [RETRY 1/3] Chuyển đối tượng bệnh nhân từ bảo hiểm sang viện phí và ngược lại
+  [RETRY 2/3] Chuyển đối tượng bệnh nhân từ bảo hiểm sang viện phí và ngược lại
+  [WARN] Generation failed after 3 retries for 'Chuyển đối tượng bệnh nhân từ bảo hiểm sang viện phí và ngược lại': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [140/472] Chỉnh sửa thông tin bệnh nhân Nội trú/ Ngoại trú
+  [RETRY 1/3] Chỉnh sửa thông tin bệnh nhân Nội trú/ Ngoại trú
+  [RETRY 2/3] Chỉnh sửa thông tin bệnh nhân Nội trú/ Ngoại trú
+  [WARN] Generation failed after 3 retries for 'Chỉnh sửa thông tin bệnh nhân Nội trú/ Ngoại trú': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [141/472] Bệnh nhân không thể xử trí ra viện
+  [RETRY 1/3] Bệnh nhân không thể xử trí ra viện
+  [RETRY 2/3] Bệnh nhân không thể xử trí ra viện
+    → 3 questions generated
+  [142/472] tại sao cùng 1 dịch vụ ngày giường mà lại nhảy ra thành 2 mục khác nhau trong bảng kê
+    → 4 questions generated
+  [143/472] Cách chuyển đổi dịch vụ khám sang công khám 0d
+    → 4 questions generated
+  [144/472] Vỏ bệnh án không hiện 1 số thông tin
+    → 5 questions generated
+  [145/472] Cách cập nhật phần mềm
+    → 3 questions generated
+  [146/472] Cách mở bệnh án hủy xử trí
+    → 3 questions generated
+  [147/472] Cách mở lại bệnh án đợt điều trị cũ
+    → 3 questions generated
+  [148/472] Cách sửa giờ xử trí ở module khám bệnh
+    → 3 questions generated
+  [149/472] Tại sao chỉ định dịch vụ cho BN rồi mà khoa Xét Nghiệm ko tìm thấy thông tin?
+    → 3 questions generated
+  [150/472] Đăng ký cho bệnh nhân cần các thao tác nào
+    → 4 questions generated
+  [151/472] Hướng dẫn Kho thuốc ngoại trú nhập thuốc từ nhà cung cấp
+    → 3 questions generated
+  [152/472] Hướng dẫn Kho thuốc ngoại trú tạo phiếu thanh toán hóa đơn nhập thuốc
+    → 3 questions generated
+  [153/472] Hướng dẫn Kho thuốc ngoại trú hủy phiếu thanh toán hóa đơn nhập thuốc
+    → 3 questions generated
+  [154/472] Không tìm thấy phiếu thuốc để tổng hợp y lệnh
+    → 3 questions generated
+  [155/472] làm thế nào để chỉ định thuốc cho bệnh nhân
+    → 3 questions generated
+  [156/472] Hướng dẫn kê đơn hoàn trả thuốc
+    → 4 questions generated
+  [157/472] Muốn cấu hình gõ tắt trong phần mềm
+    → 3 questions generated
+  [158/472] Hướng dẫn Kho thuốc ngoại trú hủy phiếu nhập thuốc từ nhà cung cấp
+    → 3 questions generated
+  [159/472] Tại sao đã lưu chữ ký scan nhưng không sử dụng được
+    → 3 questions generated
+  [160/472] Cập nhật lại mã nhóm dịch vụ đã chỉ định
+    → 3 questions generated
+  [161/472] Tại sao không thể nhập thông tin tỉnh huyện xã ở đón tiếp
+    → 4 questions generated
+  [162/472] Đã chỉ định dịch vụ chuyên khoa nhưng lại không thấy có trong module Chuyên Khoa
+    → 3 questions generated
+  [163/472] Vào kho thuốc nội trú không tìm thấy thấy phiếu thuốc
+    → 3 questions generated
+  [164/472] Thay đổi chuẩn đoán dịch vụ xét nghiệm
+    → 3 questions generated
+  [165/472] In tài liệu tùy biến ở đâu
+    → 3 questions generated
+  [166/472] Cách kê dịch vụ đi kèm PTTT
+    → 3 questions generated
+  [167/472] Tại sao không hủy được đơn thuốc kho tủ trục
+    → 3 questions generated
+  [168/472] Tại sao không cập nhật phần mềm được
+    → 3 questions generated
+  [169/472] Làm sao để mở danh sách bệnh nhân khám huyết áp ngoại trú lấy thuốc về!
+    → 3 questions generated
+  [170/472] Tại sao chỉ định thuốc không lên phiếu điều trị
+    → 3 questions generated
+  [171/472] Bệnh nhân bhyt, nhưng chỉ định dịch vụ thu phí không có tên ở bên xét nghiệm hoặc CDHA
+    → 3 questions generated
+  [172/472] Cách đổi Công khám cho BN
+    → 4 questions generated
+  [173/472] Tại sao tài khoản không click được vào nút Hủy ký
+    → 3 questions generated
+  [174/472] Bấm in hiển thị quá số lần in tối đa là 1
+    → 3 questions generated
+  [175/472] Muốn cấu hình phải ký hết tài liệu mới được xử trí thì làm như nào
+    → 3 questions generated
+  [176/472] Muốn chặn ký/hủy ký sau X giờ khi tạo tài liệu thì làm như nào
+    → 4 questions generated
+  [177/472] Sao khi Bsi đánh thuốc dịch truyền lúc hiện thể tích lúc không
+    → 3 questions generated
+  [178/472] Sao khi ra viện báo chưa thực hiện y lệnh
+    → 3 questions generated
+  [179/472] Cách chọn giờ khi chuyển khoa trong nội trú
+    → 3 questions generated
+  [180/472] Sao thu ngân không tạo phiếu cho BN
+    → 3 questions generated
+  [181/472] làm thế nào để kết thúc khám bệnh 1 bệnh nhân?
+    → 4 questions generated
+  [182/472] tìm sổ thu tiền ở đâu
+    → 3 questions generated
+  [183/472] cách để huỷ hoá đơn thanh toán
+  [RETRY 1/3] cách để huỷ hoá đơn thanh toán
+  [RETRY 2/3] cách để huỷ hoá đơn thanh toán
+  [WARN] Generation failed after 3 retries for 'cách để huỷ hoá đơn thanh toán': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [184/472] Xoá dịch vụ phẫu thuật thủ thuật phần mềm báo có đơn thuốc/ vật tư hao phí/đi kèm
+  [RETRY 1/3] Xoá dịch vụ phẫu thuật thủ thuật phần mềm báo có đơn thuốc/ vật tư hao phí/đi kèm
+  [RETRY 2/3] Xoá dịch vụ phẫu thuật thủ thuật phần mềm báo có đơn thuốc/ vật tư hao phí/đi kèm
+  [WARN] Generation failed after 3 retries for 'Xoá dịch vụ phẫu thuật thủ thuật phần mềm báo có đơn thuốc/ vật tư hao phí/đi kèm': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [185/472] Cập nhật máy thực hiện theo phòng
+  [RETRY 1/3] Cập nhật máy thực hiện theo phòng
+  [RETRY 2/3] Cập nhật máy thực hiện theo phòng
+  [WARN] Generation failed after 3 retries for 'Cập nhật máy thực hiện theo phòng': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [186/472] Cấu hình các chức vụ được phép chỉ định dịch vụ
+  [RETRY 1/3] Cấu hình các chức vụ được phép chỉ định dịch vụ
+  [RETRY 2/3] Cấu hình các chức vụ được phép chỉ định dịch vụ
+  [WARN] Generation failed after 3 retries for 'Cấu hình các chức vụ được phép chỉ định dịch vụ': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [187/472] Cấu hình người được phép thực hiện dịch vụ
+  [RETRY 1/3] Cấu hình người được phép thực hiện dịch vụ
+  [RETRY 2/3] Cấu hình người được phép thực hiện dịch vụ
+  [WARN] Generation failed after 3 retries for 'Cấu hình người được phép thực hiện dịch vụ': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [188/472] Tại sao phiếu chức năng sống khi in lại không liền mạch
+  [RETRY 1/3] Tại sao phiếu chức năng sống khi in lại không liền mạch
+  [RETRY 2/3] Tại sao phiếu chức năng sống khi in lại không liền mạch
+  [WARN] Generation failed after 3 retries for 'Tại sao phiếu chức năng sống khi in lại không liền mạch': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [189/472] Đã chỉ định dịch vụ muốn thêm ghi chú
+  [RETRY 1/3] Đã chỉ định dịch vụ muốn thêm ghi chú
+  [RETRY 2/3] Đã chỉ định dịch vụ muốn thêm ghi chú
+  [WARN] Generation failed after 3 retries for 'Đã chỉ định dịch vụ muốn thêm ghi chú': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [190/472] làm sao để in tờ bảng kiểm điều dưỡng và bác sĩ với ạ
+  [RETRY 1/3] làm sao để in tờ bảng kiểm điều dưỡng và bác sĩ với ạ
+  [RETRY 2/3] làm sao để in tờ bảng kiểm điều dưỡng và bác sĩ với ạ
+  [WARN] Generation failed after 3 retries for 'làm sao để in tờ bảng kiểm điều dưỡng và bác sĩ với ạ': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [191/472] làm sao để Chỉ định số lượng ngày giường
+  [RETRY 1/3] làm sao để Chỉ định số lượng ngày giường
+  [RETRY 2/3] làm sao để Chỉ định số lượng ngày giường
+  [WARN] Generation failed after 3 retries for 'làm sao để Chỉ định số lượng ngày giường': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [192/472] Hướng dẫn in báo cáo tạm ứng
+  [RETRY 1/3] Hướng dẫn in báo cáo tạm ứng
+  [RETRY 2/3] Hướng dẫn in báo cáo tạm ứng
+  [WARN] Generation failed after 3 retries for 'Hướng dẫn in báo cáo tạm ứng': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [193/472] Tại sao trong bệnh án không hiện bệnh chính ra viện
+  [RETRY 1/3] Tại sao trong bệnh án không hiện bệnh chính ra viện
+  [RETRY 2/3] Tại sao trong bệnh án không hiện bệnh chính ra viện
+  [WARN] Generation failed after 3 retries for 'Tại sao trong bệnh án không hiện bệnh chính ra viện': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [194/472] Tại sao không hiện bệnh kèm theo trong giấy chuyển tuyến
+  [RETRY 1/3] Tại sao không hiện bệnh kèm theo trong giấy chuyển tuyến
+  [RETRY 2/3] Tại sao không hiện bệnh kèm theo trong giấy chuyển tuyến
+  [WARN] Generation failed after 3 retries for 'Tại sao không hiện bệnh kèm theo trong giấy chuyển tuyến': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [195/472] Cách phân quyền vào danh mục vật tư
+  [RETRY 1/3] Cách phân quyền vào danh mục vật tư
+  [RETRY 2/3] Cách phân quyền vào danh mục vật tư
+  [WARN] Generation failed after 3 retries for 'Cách phân quyền vào danh mục vật tư': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [196/472] Cách bỏ dịch vụ CLS không làm
+  [RETRY 1/3] Cách bỏ dịch vụ CLS không làm
+  [RETRY 2/3] Cách bỏ dịch vụ CLS không làm
+  [WARN] Generation failed after 3 retries for 'Cách bỏ dịch vụ CLS không làm': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [197/472] Hướng dẫn phân quyền cho 1 User
+  [RETRY 1/3] Hướng dẫn phân quyền cho 1 User
+  [RETRY 2/3] Hướng dẫn phân quyền cho 1 User
+  [WARN] Generation failed after 3 retries for 'Hướng dẫn phân quyền cho 1 User': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [198/472] Hướng dẫn phân quyền cho Nhiều User
+  [RETRY 1/3] Hướng dẫn phân quyền cho Nhiều User
+  [RETRY 2/3] Hướng dẫn phân quyền cho Nhiều User
+  [WARN] Generation failed after 3 retries for 'Hướng dẫn phân quyền cho Nhiều User': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [199/472] Thêm nhà cung cấp trong danh mục
+  [RETRY 1/3] Thêm nhà cung cấp trong danh mục
+  [RETRY 2/3] Thêm nhà cung cấp trong danh mục
+  [WARN] Generation failed after 3 retries for 'Thêm nhà cung cấp trong danh mục': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [200/472] Thêm nhóm dược lý
+  [RETRY 1/3] Thêm nhóm dược lý
+  [RETRY 2/3] Thêm nhóm dược lý
+  [WARN] Generation failed after 3 retries for 'Thêm nhóm dược lý': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [201/472] Cách thêm chế độ ăn và thêm phân loại chế độ ăn
+  [RETRY 1/3] Cách thêm chế độ ăn và thêm phân loại chế độ ăn
+  [RETRY 2/3] Cách thêm chế độ ăn và thêm phân loại chế độ ăn
+  [WARN] Generation failed after 3 retries for 'Cách thêm chế độ ăn và thêm phân loại chế độ ăn': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [202/472] Cách thêm chế độ chăn sóc
+  [RETRY 1/3] Cách thêm chế độ chăn sóc
+  [RETRY 2/3] Cách thêm chế độ chăn sóc
+  [WARN] Generation failed after 3 retries for 'Cách thêm chế độ chăn sóc': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [203/472] Tại sao không hiên thị nhóm máu trong đơn máu
+  [RETRY 1/3] Tại sao không hiên thị nhóm máu trong đơn máu
+  [RETRY 2/3] Tại sao không hiên thị nhóm máu trong đơn máu
+  [WARN] Generation failed after 3 retries for 'Tại sao không hiên thị nhóm máu trong đơn máu': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [204/472] Cách phân quyền xem in báo cáo
+    → 3 questions generated
+  [205/472] Tại sao không kê được máu cho bệnh nhân
+    → 3 questions generated
+  [206/472] làm thế nào để chọn in bệnh án, hành chính, tổng kết
+    → 3 questions generated
+  [207/472] Cách chuyển đối tượng thanh toán
+    → 3 questions generated
+  [208/472] Thêm tài liệu tùy biến
+    → 3 questions generated
+  [209/472] Cách sửa lại thời gian xử trí ra viện
+    → 3 questions generated
+  [210/472] Cách lấy báo cáo khi bị lỗi không lấy được file để sửa
+    → 4 questions generated
+  [211/472] Tìm biến trong tài liệu tùy biến
+    → 4 questions generated
+  [212/472] Hướng dẫn cách chuyển loại bệnh án cho BN
+    → 3 questions generated
+  [213/472] Thêm phiếu tài liệu tùy biến
+    → 3 questions generated
+  [214/472] Sao bác sĩ muốn sửa phiếu thuốc lại không có nút hủy gửi phiếu để sửa
+    → 3 questions generated
+  [215/472] Cách đổi loại bệnh án
+    → 3 questions generated
+  [216/472] Cách xem danh sách bệnh nhân khám bệnh
+    → 3 questions generated
+  [217/472] Làm thế nào để không hiển thị tài liệu ở tab Bệnh án điện tử
+    → 3 questions generated
+  [218/472] Phân quyền chỉ định dịch vụ ngày giường
+    → 3 questions generated
+  [219/472] Tại sao tài liệu chưa ký vẫn xử trí ra viện k có cảnh báo/chặn thiếu chữ ký
+    → 4 questions generated
+  [220/472] Tại sao gõ ra không tìm được thuốc, vật tư, mã bệnh
+    → 3 questions generated
+  [221/472] muốn tim bệnh nhân ngày hôm trước hoặc 1 tháng 1 tuần thì làm cách nào
+    → 5 questions generated
+  [222/472] Muốn phân quyền cho người dùng, nhân viên thì vào đâu?
+    → 3 questions generated
+  [223/472] Chuyển ngày giường
+    → 3 questions generated
+  [224/472] Kê thuốc ở ngoài
+    → 3 questions generated
+  [225/472] Cách đặt giờ dịch vụ ngày giường
+    → 3 questions generated
+  [226/472] Làm sao để đổi thuốc sang phiếu điều trị khác
+    → 3 questions generated
+  [227/472] Cách thực hiện y lệnh
+    → 3 questions generated
+  [228/472] Sao khi XN ấn thực hiện giờ thực hiện là 1 giờ mà khi trả kết quả giờ đổi sang giờ mới
+    → 4 questions generated
+  [229/472] Cách tổng hợp phiếu lĩnh thuốc
+    → 3 questions generated
+  [230/472] tôi muốn chuyển bệnh án cho bệnh nhân tìm ở đâu
+    → 5 questions generated
+  [231/472] Cách sửa hướng dẫn sử dụng thuốc khi đã kê
+    → 4 questions generated
+  [232/472] cách phân quyền bác sĩ vào các phòng chức năng tương ứng
+    → 3 questions generated
+  [233/472] Lỗi khi mở tài khoản kết nối máy xét nghiệm báo không thể mở kết nối
+    → 3 questions generated
+  [234/472] cách thêm danh sách mẫu kết quả dịch vụ có sẵn?
+    → 3 questions generated
+  [235/472] tôi muốn duyệt đơn thuốc tìm ở đâu
+  [WARN] Filtered 1 question(s) with Chinese characters for 'tôi muốn duyệt đơn thuốc tìm ở đâu'
+    → SKIPPED (no questions generated)
+  [236/472] tôi muốn lọc dữ liệu theo buồng diều trị tìm ở đâu
+    → 1 questions generated
+  [237/472] Tại sao xuất dây chuyền lại không được
+    → 3 questions generated
+  [238/472] Lỗi không tìm thấy phần mềm
+    → 3 questions generated
+  [239/472] Cách bật màn hình chờ khám bệnh
+    → 3 questions generated
+  [240/472] Cách tạo giấy thử phản ứng thuốc
+    → 4 questions generated
+  [241/472] Cách nhập thuốc tù nhà cung cấp
+    → 3 questions generated
+  [242/472] Cách kiểm tra bệnh nhân chưa có thuốc trong ngày
+    → 4 questions generated
+  [243/472] Cách chuyển loại bệnh án của BN
+    → 3 questions generated
+  [244/472] tìm lọc dữ liệu theo bác sĩ điều trị ở đâu
+    → 1 questions generated
+  [245/472] Không hiển thị nhà thuốc để chọn
+    → 3 questions generated
+  [246/472] Mở bệnh án có xử trí bị báo lỗi ở module Khám bệnh
+    → 3 questions generated
+  [247/472] Cách cập nhật dịch vụ khi đổi giá hoặc tên cho BN đã thực hiện dịch vụ xong
+    → 4 questions generated
+  [248/472] Thêm cảnh báo chỉ định thuốc
+    → 3 questions generated
+  [249/472] Xuất danh sách các thuốc hết hạn làm như nào
+  [RETRY 1/3] Xuất danh sách các thuốc hết hạn làm như nào
+  [RETRY 2/3] Xuất danh sách các thuốc hết hạn làm như nào
+  [WARN] Generation failed after 3 retries for 'Xuất danh sách các thuốc hết hạn làm như nào': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [250/472] In lẻ từng chỉ định dịch vụ xét nghiệm đã chọn
+  [RETRY 1/3] In lẻ từng chỉ định dịch vụ xét nghiệm đã chọn
+  [RETRY 2/3] In lẻ từng chỉ định dịch vụ xét nghiệm đã chọn
+  [WARN] Generation failed after 3 retries for 'In lẻ từng chỉ định dịch vụ xét nghiệm đã chọn': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [251/472] Hướng dẫn cách đặt Lịch hẹn khám
+  [RETRY 1/3] Hướng dẫn cách đặt Lịch hẹn khám
+  [RETRY 2/3] Hướng dẫn cách đặt Lịch hẹn khám
+  [WARN] Generation failed after 3 retries for 'Hướng dẫn cách đặt Lịch hẹn khám': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [252/472] Hướng dẫn cách hủy Lịch hẹn khám
+  [RETRY 1/3] Hướng dẫn cách hủy Lịch hẹn khám
+  [RETRY 2/3] Hướng dẫn cách hủy Lịch hẹn khám
+  [WARN] Generation failed after 3 retries for 'Hướng dẫn cách hủy Lịch hẹn khám': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [253/472] Muốn thống kê bệnh nhân đặt lịch hẹn trước
+  [RETRY 1/3] Muốn thống kê bệnh nhân đặt lịch hẹn trước
+  [RETRY 2/3] Muốn thống kê bệnh nhân đặt lịch hẹn trước
+  [WARN] Generation failed after 3 retries for 'Muốn thống kê bệnh nhân đặt lịch hẹn trước': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [254/472] Lấy danh sách bệnh nhân đặt hẹn theo ngày hẹn đến khám
+  [RETRY 1/3] Lấy danh sách bệnh nhân đặt hẹn theo ngày hẹn đến khám
+  [RETRY 2/3] Lấy danh sách bệnh nhân đặt hẹn theo ngày hẹn đến khám
+  [WARN] Generation failed after 3 retries for 'Lấy danh sách bệnh nhân đặt hẹn theo ngày hẹn đến khám': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [255/472] Sửa thông tin/thời gian đặt lịch hẹn khám
+  [RETRY 1/3] Sửa thông tin/thời gian đặt lịch hẹn khám
+    → 4 questions generated
+  [256/472] làm sao để lấy báo cáo thời gian chờ khám của bệnh nhân
+    → 3 questions generated
+  [257/472] Sao đánh phiếu máu lại báo lỗi
+    → 3 questions generated
+  [258/472] Xuất BC bệnh nhân không có thuốc trong ngày mong muốn
+    → 4 questions generated
+  [259/472] cách tạo phiếu chức năng sống
+  [RETRY 1/3] cách tạo phiếu chức năng sống
+  [RETRY 2/3] cách tạo phiếu chức năng sống
+  [WARN] Generation failed after 3 retries for 'cách tạo phiếu chức năng sống': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [260/472] Cách cho BN điều trị kết hợp
+  [RETRY 1/3] Cách cho BN điều trị kết hợp
+  [RETRY 2/3] Cách cho BN điều trị kết hợp
+  [WARN] Generation failed after 3 retries for 'Cách cho BN điều trị kết hợp': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [261/472] Cách đổi phòng khám cho bệnh nhân đăng kí khám nhưng chưa khám
+  [RETRY 1/3] Cách đổi phòng khám cho bệnh nhân đăng kí khám nhưng chưa khám
+  [RETRY 2/3] Cách đổi phòng khám cho bệnh nhân đăng kí khám nhưng chưa khám
+  [WARN] Generation failed after 3 retries for 'Cách đổi phòng khám cho bệnh nhân đăng kí khám nhưng chưa khám': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [262/472] Bệnh nhân ra viện ngày mai có xử trí viện trước được không?
+  [RETRY 1/3] Bệnh nhân ra viện ngày mai có xử trí viện trước được không?
+  [RETRY 2/3] Bệnh nhân ra viện ngày mai có xử trí viện trước được không?
+  [WARN] Generation failed after 3 retries for 'Bệnh nhân ra viện ngày mai có xử trí viện trước được không?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [263/472] Tại sao đặt hẹn nhưng không lưu ngày mới
+  [RETRY 1/3] Tại sao đặt hẹn nhưng không lưu ngày mới
+  [RETRY 2/3] Tại sao đặt hẹn nhưng không lưu ngày mới
+  [WARN] Generation failed after 3 retries for 'Tại sao đặt hẹn nhưng không lưu ngày mới': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [264/472] làm sao để xử trí trước ngày hôm sau ra viện hoặc ngày theo í muốn
+  [RETRY 1/3] làm sao để xử trí trước ngày hôm sau ra viện hoặc ngày theo í muốn
+  [RETRY 2/3] làm sao để xử trí trước ngày hôm sau ra viện hoặc ngày theo í muốn
+  [WARN] Generation failed after 3 retries for 'làm sao để xử trí trước ngày hôm sau ra viện hoặc ngày theo í muốn': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [265/472] Cách sửa thông tin bệnh nhân khám bệnh
+  [RETRY 1/3] Cách sửa thông tin bệnh nhân khám bệnh
+  [RETRY 2/3] Cách sửa thông tin bệnh nhân khám bệnh
+  [WARN] Filtered 1 question(s) with Chinese characters for 'Cách sửa thông tin bệnh nhân khám bệnh'
+    → 2 questions generated
+  [266/472] Cách sửa thông tin bệnh nhân điều trị
+    → 3 questions generated
+  [267/472] Cách thêm danh sách từ gõ tắt
+    → 3 questions generated
+  [268/472] Cách phân quyền vào danh mục
+    → 3 questions generated
+  [269/472] Muốn tóm tắt hồ sơ bệnh án của BN?
+    → 4 questions generated
+  [270/472] Tại sao không duyệt được bảng kê chi phí khám bệnh?
+    → 3 questions generated
+  [271/472] Làm sao để biết lỗi dịch vụ gì ?
+    → 3 questions generated
+  [272/472] Cách xem số lượng bệnh nhân đang điều tri trong khoa
+    → 3 questions generated
+  [273/472] Cách tạo báo cáo dẫn xuất
+    → 3 questions generated
+  [274/472] Cách tạo mẫu kết quả dịch vụ
+    → 3 questions generated
+  [275/472] Cách chuyển phiếu điều trị đã có thuốc vât tư duyệt y lệnh
+    → 4 questions generated
+  [276/472] Cách đóng băng bớt số lượng thuốc lại
+    → 4 questions generated
+  [277/472] Muốn truyền máu cho bệnh nhân thì chọn thế nào ?
+    → 3 questions generated
+  [278/472] Muốn xử trí cho BN ra viện ngày hôm nay mà BN vẫn còn thuốc ngày mai
+    → 3 questions generated
+  [279/472] Đối với bệnh nhân dưới 6 tuổi cần thêm thông tin bố mẹ hoặc người giám hộ.
+    → 4 questions generated
+  [280/472] Muốn chuyển phòng thực hiện xét nghiệm cho BN?
+    → 4 questions generated
+  [281/472] Tại sao không chuyển được phòng thực hiện xét nghiệm cho BN?
+    → 3 questions generated
+  [282/472] Muốn thống kê thuốc, vật tư, dịch vụ của BN
+    → 3 questions generated
+  [283/472] quản lý y lệnh tìm ở đâu
+    → 3 questions generated
+  [284/472] quản lý thuốc ở đâu
+    → 3 questions generated
+  [285/472] quản lý vật tư ở đâu
+    → 3 questions generated
+  [286/472] Xem lịch sử các lần điều trị trước của BN
+    → 4 questions generated
+  [287/472] quản lý máu ở đâu
+    → 3 questions generated
+  [288/472] Chuyển tuyến với bệnh nhân tình trạng vượt quá chuyên môn hoặc theo yêu cầu của người nhà bệnh nhân
+    → 4 questions generated
+  [289/472] in phiếu công khai thuốc, vật tư ... khi BN ra viện
+    → 3 questions generated
+  [290/472] Bị lỗi biến
+    → 3 questions generated
+  [291/472] Sửa ngày của phiếu xét nghiệm
+    → 4 questions generated
+  [292/472] Sao khi nhập bù cơ số số liệu nhập bù lệch với kho
+    → 3 questions generated
+  [293/472] Sao bsi mở BA ra lại không thấy y lệnh trong quản lý y lệnh
+    → 3 questions generated
+  [294/472] Sao khi chỉ định dịch vụ mà bên module thực hiện lại không thấy
+    → 3 questions generated
+  [295/472] cách hủy tạm dừng khám bệnh bệnh nhân nội trú
+    → 4 questions generated
+  [296/472] cách chuyển đối tượng bệnh nhân từ viện phí sang bảo hiểm khi bệnh nhân mang byht đến sau
+    → 3 questions generated
+  [297/472] Cách thêm liễu dùng thuốc
+    → 4 questions generated
+  [298/472] Cách hủy điều trị kết hợp
+    → 3 questions generated
+  [299/472] cách in bệnh án ngoại trú với bệnh nhân điều trị ngoại trú
+    → 3 questions generated
+  [300/472] Tại sao bác sĩ không kí được phiếu xét nghiệm
+    → 3 questions generated
+  [301/472] Xem danh sách phiếu thu hóa đơn điện tử ở đâu
+    → 3 questions generated
+  [302/472] Tại sao không hủy duyệt thanh toán được
+    → 4 questions generated
+  [303/472] Tại sao không cấp được giấy chứng sinh
+    → 4 questions generated
+  [304/472] Tại sao phần mềm không cho sửa giờ vào khoa
+    → 3 questions generated
+  [305/472] Phần mềm báo lỗi, không mở được phần mềm phải làm sao?
+    → 3 questions generated
+  [306/472] Lỗi không huỷ được phiếu vì đã ký điện tử
+    → 3 questions generated
+  [307/472] Tại sao sau khi sửa phiếu trong danh mục tài liệu, khi in lại không update
+  [RETRY 1/3] Tại sao sau khi sửa phiếu trong danh mục tài liệu, khi in lại không update
+  [RETRY 2/3] Tại sao sau khi sửa phiếu trong danh mục tài liệu, khi in lại không update
+  [WARN] Generation failed after 3 retries for 'Tại sao sau khi sửa phiếu trong danh mục tài liệu, khi in lại không update': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [308/472] Xoá bệnh nhân hiển thị đã có phiếu thu phải làm sao
+  [RETRY 1/3] Xoá bệnh nhân hiển thị đã có phiếu thu phải làm sao
+  [RETRY 2/3] Xoá bệnh nhân hiển thị đã có phiếu thu phải làm sao
+  [WARN] Generation failed after 3 retries for 'Xoá bệnh nhân hiển thị đã có phiếu thu phải làm sao': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [309/472] Khi in có hiện form in nhưng không hiện nội dung
+  [RETRY 1/3] Khi in có hiện form in nhưng không hiện nội dung
+  [RETRY 2/3] Khi in có hiện form in nhưng không hiện nội dung
+  [WARN] Generation failed after 3 retries for 'Khi in có hiện form in nhưng không hiện nội dung': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [310/472] Tại sao thuốc/ vật tư hoàn trả vẫn hiện ở phiếu bảng kê khám chữa bệnh
+  [RETRY 1/3] Tại sao thuốc/ vật tư hoàn trả vẫn hiện ở phiếu bảng kê khám chữa bệnh
+  [RETRY 2/3] Tại sao thuốc/ vật tư hoàn trả vẫn hiện ở phiếu bảng kê khám chữa bệnh
+  [WARN] Generation failed after 3 retries for 'Tại sao thuốc/ vật tư hoàn trả vẫn hiện ở phiếu bảng kê khám chữa bệnh': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [311/472] làm sao để phân quyền cho user vào kho hủy để lấy phiếu xác nhận hỏng vỡ, hết hạn
+  [RETRY 1/3] làm sao để phân quyền cho user vào kho hủy để lấy phiếu xác nhận hỏng vỡ, hết hạn
+  [RETRY 2/3] làm sao để phân quyền cho user vào kho hủy để lấy phiếu xác nhận hỏng vỡ, hết hạn
+  [WARN] Generation failed after 3 retries for 'làm sao để phân quyền cho user vào kho hủy để lấy phiếu xác nhận hỏng vỡ, hết hạn': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [312/472] làm sao để thống kê danh sách bệnh nhân nhập viện
+  [RETRY 1/3] làm sao để thống kê danh sách bệnh nhân nhập viện
+  [RETRY 2/3] làm sao để thống kê danh sách bệnh nhân nhập viện
+  [WARN] Generation failed after 3 retries for 'làm sao để thống kê danh sách bệnh nhân nhập viện': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [313/472] Cách thêm danh sách đường dùng thuốc
+  [RETRY 1/3] Cách thêm danh sách đường dùng thuốc
+  [RETRY 2/3] Cách thêm danh sách đường dùng thuốc
+    → 3 questions generated
+  [314/472] Cách thêm hướng dẫn sử dụng thuốc
+    → 3 questions generated
+  [315/472] Tại sao trong bệnh án không hiện mã bệnh
+    → 3 questions generated
+  [316/472] Cách sửa ngày y lệnh ngày giường
+    → 4 questions generated
+  [317/472] tìm quản lý sữa ở đâu
+    → 3 questions generated
+  [318/472] tìm quản lý suất ăn ở đâu
+    → 3 questions generated
+  [319/472] Cách sửa ngày hẹn khám lại
+    → 3 questions generated
+  [320/472] Cách sửa lỗi ngày hẹn không đúng
+    → 3 questions generated
+  [321/472] Cách sửa công khám
+    → 4 questions generated
+  [322/472] Sửa đối tượng dịch vụ đang điều trị nội trú
+    → 4 questions generated
+  [323/472] Cách để tổng hợp phiếu hoàn trả vật tư
+    → 4 questions generated
+  [324/472] Cách in giấy chứng nhận PTTT
+    → 3 questions generated
+  [325/472] Tổng hợp phiếu hoàn trả thuốc
+    → 5 questions generated
+  [326/472] quản lý cận lâm sàng tìm ở đâu
+    → 4 questions generated
+  [327/472] Muốn gõ địa chỉ Hồ Chí Minh Quận 10 ở đón tiếp thì làm như nào
+    → 3 questions generated
+  [328/472] Tại sao khi đã xét nghiệm thành công rồi nhưng bên phòng khám ko thấy kết quả?
+    → 3 questions generated
+  [329/472] cách tìm bệnh nhân có giấy chuyển tuyến để kiểm tra
+    → 3 questions generated
+  [330/472] tìm quản lý gường ở đâu
+    → 3 questions generated
+  [331/472] Cách thêm tương tác thuốc
+    → 3 questions generated
+  [332/472] Cách tạo sổ báo tử
+    → 5 questions generated
+  [333/472] cách sửa thông tin đơn thuốc khi đã lên đơn thuốc
+    → 3 questions generated
+  [334/472] Cách điều trị kết hợp cho bệnh nhân
+    → 5 questions generated
+  [335/472] Cách xem nhật ký sự kiện của bệnh án
+    → 4 questions generated
+  [336/472] Tại sao dưới khoa không tin thấy dịch vụ
+    → 3 questions generated
+  [337/472] cách in sổ xét nghiệm
+    → 4 questions generated
+  [338/472] cách sửa giờ xử trí
+    → 3 questions generated
+  [339/472] cách sửa giờ vào khám
+    → 3 questions generated
+  [340/472] cách bỏ làm 1 dịch vụ xét nghiệm khi dịch vụ đã được lấy mẫu bệnh phẩm
+    → 4 questions generated
+  [341/472] Bệnh nhân sai thông tin dân tộc sửa kiểu gì
+    → 4 questions generated
+  [342/472] Bệnh nhân chưa có dịch vụ cấp giấy chứng sinh là sao
+    → 3 questions generated
+  [343/472] Không cấp được giấy chứng sinh do chưa điền số lượng con
+    → 3 questions generated
+  [344/472] Tại sao có lỗi thời gian thực hiện đang lớn hơn ngày ra
+    → 3 questions generated
+  [345/472] Tại sao không xóa được dịch vụ
+    → 3 questions generated
+  [346/472] Làm thế nào để dự trù vật tư về tủ trực của khoa
+    → 4 questions generated
+  [347/472] Làm thế nào để dự trù thuốc về tủ trực của khoa
+    → 3 questions generated
+  [348/472] Cách chỉ định vật tư hao phí đi kèm PTTT
+    → 3 questions generated
+  [349/472] Tại sao không xử trí BN được?
+    → 3 questions generated
+  [350/472] Tại sao khi in đơn thuốc không hiện ngày tái khám?
+    → 3 questions generated
+  [351/472] Muốn chuyển phòng khám cho bệnh nhân?
+    → 3 questions generated
+  [352/472] Tại sao khi bác sĩ kê đơn rồi lại không thấy đơn thuốc ở kho thuốc ngoại trú ?
+    → 4 questions generated
+  [353/472] Tại sao không thể tạo phiếu bổ sung cơ số tủ trực
+    → 3 questions generated
+  [354/472] Tại sao khi xử trí phần mềm lại báo có dịch vụ khác có thời gian y lệnh lớn hơn thời gian xử trí ra viện
+    → 4 questions generated
+  [355/472] Tại sao khi xử trí ra viện phần mềm lại báo tổng số ngày giường lớn hơn số ngày điều trị.
+  [RETRY 1/3] Tại sao khi xử trí ra viện phần mềm lại báo tổng số ngày giường lớn hơn số ngày điều trị.
+  [RETRY 2/3] Tại sao khi xử trí ra viện phần mềm lại báo tổng số ngày giường lớn hơn số ngày điều trị.
+  [WARN] Generation failed after 3 retries for 'Tại sao khi xử trí ra viện phần mềm lại báo tổng số ngày giường lớn hơn số ngày điều trị.': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [356/472] Vì sao lúc có thể sửa được giờ phiếu điều trị , lúc thì không ?
+  [RETRY 1/3] Vì sao lúc có thể sửa được giờ phiếu điều trị , lúc thì không ?
+  [RETRY 2/3] Vì sao lúc có thể sửa được giờ phiếu điều trị , lúc thì không ?
+  [WARN] Generation failed after 3 retries for 'Vì sao lúc có thể sửa được giờ phiếu điều trị , lúc thì không ?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [357/472] Tại sao khi kê đơn thuốc trong điều trị nhưng thời gian y lệnh hiển thị không đúng hiện tại?
+  [RETRY 1/3] Tại sao khi kê đơn thuốc trong điều trị nhưng thời gian y lệnh hiển thị không đúng hiện tại?
+  [RETRY 2/3] Tại sao khi kê đơn thuốc trong điều trị nhưng thời gian y lệnh hiển thị không đúng hiện tại?
+  [WARN] Generation failed after 3 retries for 'Tại sao khi kê đơn thuốc trong điều trị nhưng thời gian y lệnh hiển thị không đúng hiện tại?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [358/472] Chuyển loại bệnh án
+  [RETRY 1/3] Chuyển loại bệnh án
+  [RETRY 2/3] Chuyển loại bệnh án
+  [WARN] Generation failed after 3 retries for 'Chuyển loại bệnh án': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [359/472] Bổ sung thẻ BHYT đối tượng nội trú
+  [RETRY 1/3] Bổ sung thẻ BHYT đối tượng nội trú
+  [RETRY 2/3] Bổ sung thẻ BHYT đối tượng nội trú
+  [WARN] Generation failed after 3 retries for 'Bổ sung thẻ BHYT đối tượng nội trú': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [360/472] làm sao để kho ngoại trú vào kiểm tra được bác sỹ vào chiếm kho hay chưa hoàn tất
+  [RETRY 1/3] làm sao để kho ngoại trú vào kiểm tra được bác sỹ vào chiếm kho hay chưa hoàn tất
+  [RETRY 2/3] làm sao để kho ngoại trú vào kiểm tra được bác sỹ vào chiếm kho hay chưa hoàn tất
+  [WARN] Generation failed after 3 retries for 'làm sao để kho ngoại trú vào kiểm tra được bác sỹ vào chiếm kho hay chưa hoàn tất': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [361/472] làm sao để xóa dịch vụ khác của bệnh nhân đã ra viện
+  [RETRY 1/3] làm sao để xóa dịch vụ khác của bệnh nhân đã ra viện
+    → 3 questions generated
+  [362/472] Cách thêm lời dặn của bác sĩ trong đơn thuốc
+    → 3 questions generated
+  [363/472] Tại sao bác sĩ không thấy giấy khám bệnh vào viện của bệnh nhân
+    → 3 questions generated
+  [364/472] thêm cấu hình quyền lợi thẻ BHYT
+    → 3 questions generated
+  [365/472] quản lý dịch truyền ở đâu
+    → 5 questions generated
+  [366/472] ký chữ ký điện tử đối với giấy chuyển tuyến như nào?
+  [RETRY 1/3] ký chữ ký điện tử đối với giấy chuyển tuyến như nào?
+  [RETRY 2/3] ký chữ ký điện tử đối với giấy chuyển tuyến như nào?
+  [WARN] Generation failed after 3 retries for 'ký chữ ký điện tử đối với giấy chuyển tuyến như nào?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [367/472] Cách sửa nội dung phiếu điều trị khi bệnh nhân đã ra viện
+  [RETRY 1/3] Cách sửa nội dung phiếu điều trị khi bệnh nhân đã ra viện
+  [RETRY 2/3] Cách sửa nội dung phiếu điều trị khi bệnh nhân đã ra viện
+  [WARN] Generation failed after 3 retries for 'Cách sửa nội dung phiếu điều trị khi bệnh nhân đã ra viện': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [368/472] Kiểm tra lịch sử thay đổi đối tượng dịch vụ
+  [RETRY 1/3] Kiểm tra lịch sử thay đổi đối tượng dịch vụ
+  [RETRY 2/3] Kiểm tra lịch sử thay đổi đối tượng dịch vụ
+  [WARN] Generation failed after 3 retries for 'Kiểm tra lịch sử thay đổi đối tượng dịch vụ': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [369/472] Cách thêm giường bệnh?
+  [RETRY 1/3] Cách thêm giường bệnh?
+  [RETRY 2/3] Cách thêm giường bệnh?
+  [WARN] Generation failed after 3 retries for 'Cách thêm giường bệnh?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [370/472] Cách sửa thời gian xét nghiệm
+  [RETRY 1/3] Cách sửa thời gian xét nghiệm
+  [RETRY 2/3] Cách sửa thời gian xét nghiệm
+  [WARN] Generation failed after 3 retries for 'Cách sửa thời gian xét nghiệm': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [371/472] Tại sao đã chỉ định thuốc cho BN nội trú nhưng không tìm thấy mã phiếu trong kho thuốc?
+  [RETRY 1/3] Tại sao đã chỉ định thuốc cho BN nội trú nhưng không tìm thấy mã phiếu trong kho thuốc?
+  [RETRY 2/3] Tại sao đã chỉ định thuốc cho BN nội trú nhưng không tìm thấy mã phiếu trong kho thuốc?
+  [WARN] Generation failed after 3 retries for 'Tại sao đã chỉ định thuốc cho BN nội trú nhưng không tìm thấy mã phiếu trong kho thuốc?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [372/472] Lỗi không in được trang bệnh án mình đã chọn
+  [RETRY 1/3] Lỗi không in được trang bệnh án mình đã chọn
+  [RETRY 2/3] Lỗi không in được trang bệnh án mình đã chọn
+    → 3 questions generated
+  [373/472] Hướng dẫn tổng hợp phiếu lĩnh thuốc
+    → 3 questions generated
+  [374/472] Cấu hình chưa đủ chữ kí thì không được đóng dấu làm sao
+    → 4 questions generated
+  [375/472] Cấu hình số lần in của phiếu kết quả xét nghiệm như nào
+    → 3 questions generated
+  [376/472] Dịch vụ xét nghiệm không hiện thị trên phiếu điều trị sửa làm sao
+    → 3 questions generated
+  [377/472] quản lý bệnh nhân mổ tìm ở đâu
+    → 3 questions generated
+  [378/472] Quản lý bệnh nhân đẻ tìm ở đâu
+    → 3 questions generated
+  [379/472] Muốn cấu hình dịch vụ đã làm rồi thì phải sau một khoảng thời gian BN mới được làm tiếp như thế nào
+    → 4 questions generated
+  [380/472] Tại sao sửa phiếu, báo cáo xong mà máy của viện không cập nhật phiếu, báo cáo mới
+    → 3 questions generated
+  [381/472] Tại sao khi xử trí lại có thông báo lỗi trạng thái
+    → 3 questions generated
+  [382/472] Cấu hình in nâng cao
+  [WARN] Filtered 1 question(s) with Chinese characters for 'Cấu hình in nâng cao'
+    → 4 questions generated
+  [383/472] quản lý lịch mổ tìm ở đâu
+    → 3 questions generated
+  [384/472] Cách chuyển loại bệnh án cho BN
+    → 3 questions generated
+  [385/472] Cách tạo thêm một giường bệnh cho viện
+    → 3 questions generated
+  [386/472] Cách lưu trữ hồ sơ
+    → 3 questions generated
+  [387/472] Tại sao thấy bs lên thuốc mà không thấy gửi phiếu cho Dược duyệt
+    → 3 questions generated
+  [388/472] Cách taọ giấy nghỉ ốm
+    → 4 questions generated
+  [389/472] Tạo giấy khám sức khỏe
+    → 3 questions generated
+  [390/472] tại sao nội dung phương pháp điều trị trong giấy ra viện hiển thị nội dung bị xuống dòng
+    → 3 questions generated
+  [391/472] cách chọn ekip chẩn đoán hình ảnh
+    → 3 questions generated
+  [392/472] tại sao phiếu kết quả dịch vụ sau khi sửa lại phiếu trong hệ thống mà thoát phần mềm ra vào lại không thay đổi
+    → 3 questions generated
+  [393/472] cách tìm biến thành viên PTTT trong danh mục e-kip PTTT để thêm vào danh sách Phẫu thuật thủ thuật
+    → 3 questions generated
+  [394/472] tại sao khi bác sĩ ấn in lại không hiện ra giao diện nội dung in
+    → 3 questions generated
+  [395/472] làm thế nào để xem sinh nhật bệnh nhân
+    → 4 questions generated
+  [396/472] vỏ bệnh án in lỗi mất chữ trái hoặc phải
+    → 4 questions generated
+  [397/472] Cách in phiếu chỉ định dịch vụ riêng
+    → 4 questions generated
+  [398/472] Tại mở bệnh án ra lưu lại mà không lưu được, phần mềm cũng không báo gì sau khi bấm lưu
+    → 4 questions generated
+  [399/472] Hướng dẫn thêm phòng chức năng
+    → 4 questions generated
+  [400/472] Chuyển BN sang phòng khám khác
+    → 5 questions generated
+  [401/472] Thay đổi công khám cho BN
+    → 3 questions generated
+  [402/472] Muốn thuốc tự động nhập kho trong tủ trực mà không cần ấn nhập kho
+    → 3 questions generated
+  [403/472] Thêm hạn thẻ BHYT mới cho BN
+    → 3 questions generated
+  [404/472] Muốn cấu hình phòng chuẩn đoán hình ảnh dành cho khám sức khỏe doanh nghiệp
+    → 3 questions generated
+  [405/472] Lấy danh sách bệnh nhân vào viện - chuyển viện - ra viện
+    → 4 questions generated
+  [406/472] Cài hình thời gian tối thiểu thực hiện một dịch vụ như nào
+    → 3 questions generated
+  [407/472] Cài định mức hao phí vât tư tiêu hao khi chỉ định dịch vụ
+    → 3 questions generated
+  [408/472] Tại sao báo cáo xuất tồn lại bị âm
+    → 3 questions generated
+  [409/472] In phiếu khám chữa bệnh tìm ở đâu
+    → 3 questions generated
+  [410/472] in bảng kê khám bệnh, chữa bệnh tìm ở đâu
+    → 3 questions generated
+  [411/472] in phiếu thanh toán bhyt nội trú ở đâu
+    → 4 questions generated
+  [412/472] Tại sao không tạo được phiếu truyền
+    → 3 questions generated
+  [413/472] Muốn chỉ định phiếu truyền máu cho BN làm như nào
+    → 3 questions generated
+  [414/472] Muốn in báo cáo nhập xuất tồn thuốc toàn viện ở đâu
+  [RETRY 1/3] Muốn in báo cáo nhập xuất tồn thuốc toàn viện ở đâu
+  [RETRY 2/3] Muốn in báo cáo nhập xuất tồn thuốc toàn viện ở đâu
+  [WARN] Generation failed after 3 retries for 'Muốn in báo cáo nhập xuất tồn thuốc toàn viện ở đâu': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [415/472] tại sao không in được đơn thuốc ở CDHA
+  [RETRY 1/3] tại sao không in được đơn thuốc ở CDHA
+  [RETRY 2/3] tại sao không in được đơn thuốc ở CDHA
+  [WARN] Generation failed after 3 retries for 'tại sao không in được đơn thuốc ở CDHA': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [416/472] tại sao khi xuất dữ liệu báo cáo lại có ô không hiện được dữ liệu
+  [RETRY 1/3] tại sao khi xuất dữ liệu báo cáo lại có ô không hiện được dữ liệu
+  [RETRY 2/3] tại sao khi xuất dữ liệu báo cáo lại có ô không hiện được dữ liệu
+  [WARN] Generation failed after 3 retries for 'tại sao khi xuất dữ liệu báo cáo lại có ô không hiện được dữ liệu': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [417/472] Làm thế nào để lấy báo cáo số lượng thực hiện dịch vụ theo phòng thực hiện
+  [RETRY 1/3] Làm thế nào để lấy báo cáo số lượng thực hiện dịch vụ theo phòng thực hiện
+  [RETRY 2/3] Làm thế nào để lấy báo cáo số lượng thực hiện dịch vụ theo phòng thực hiện
+  [WARN] Generation failed after 3 retries for 'Làm thế nào để lấy báo cáo số lượng thực hiện dịch vụ theo phòng thực hiện': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [418/472] Làm thế nào để sửa thời gian thực hiện và thời gian trả kết quả xét nghiệm
+  [RETRY 1/3] Làm thế nào để sửa thời gian thực hiện và thời gian trả kết quả xét nghiệm
+  [RETRY 2/3] Làm thế nào để sửa thời gian thực hiện và thời gian trả kết quả xét nghiệm
+  [WARN] Generation failed after 3 retries for 'Làm thế nào để sửa thời gian thực hiện và thời gian trả kết quả xét nghiệm': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [419/472] Làm thế nào để tách đối tượng điều trị
+  [RETRY 1/3] Làm thế nào để tách đối tượng điều trị
+  [RETRY 2/3] Làm thế nào để tách đối tượng điều trị
+  [WARN] Generation failed after 3 retries for 'Làm thế nào để tách đối tượng điều trị': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [420/472] Làm thế nào để nhập bệnh án lưu trữ
+  [RETRY 1/3] Làm thế nào để nhập bệnh án lưu trữ
+  [RETRY 2/3] Làm thế nào để nhập bệnh án lưu trữ
+    → 3 questions generated
+  [421/472] tại sao bệnh nhân có ngày giờ chỉ định khác với ngày giờ y lệnh?
+    → 4 questions generated
+  [422/472] màn hình anydesk máy kết nối quá bé không hiện hết các module phải làm sao
+    → 3 questions generated
+  [423/472] Thêm mã thẻ BHYT ở đâu?
+    → 3 questions generated
+  [424/472] Không in được tài liệu khi chưa ký
+    → 4 questions generated
+  [425/472] Khi mở lại bệnh án(không cho xử tri lại) muốn xử trí phải làm như thế nào?
+    → 3 questions generated
+  [426/472] in phiếu công khai thuốc, vật tư, dịch vụ ở đâu
+    → 4 questions generated
+  [427/472] Tại sao không tiếp nhận gói khám biên phòng 2 cho nhận bệnh nhân
+    → 4 questions generated
+  [428/472] in báo cáo hoạt động điều trị ở đâu
+    → 3 questions generated
+  [429/472] in phiếu báo cáo sổ vào viện, ra viện, chuyển viện ở đâu
+    → 4 questions generated
+  [430/472] Khi lưu phiếu truyền máu phần mềm báo chưa nhập bác sĩ chỉ định
+    → 3 questions generated
+  [431/472] Tại sao không thấy tìm thấy phiếu truyền dịch đã đánh
+    → 3 questions generated
+  [432/472] Phần mềm bị treo không thao tác được, không tắt được phần mềm
+  [WARN] Filtered 1 question(s) with Chinese characters for 'Phần mềm bị treo không thao tác được, không tắt được phần mềm'
+    → SKIPPED (no questions generated)
+  [433/472] Tại sao không bắt đầu khám được
+    → 3 questions generated
+  [434/472] tại sao vỏ bệnh án chỉ hiện in không có phần ký
+    → 4 questions generated
+  [435/472] muốn xem thiết bị kết nối (trung tâm kết nối thiết bị) tìm ở đâu
+    → 4 questions generated
+  [436/472] lịch sử kiểm tra thẻ bảo hiểm không hiện lịch sử phải làm sao
+    → 3 questions generated
+  [437/472] in báo cáo y lệnh hằng ngày tìm ở đâu
+    → 4 questions generated
+  [438/472] Cách xóa bệnh nhân không khám bệnh nữa
+    → 3 questions generated
+  [439/472] Cách gộp mã bệnh nhân
+    → 3 questions generated
+  [440/472] Cách chuyển đợt thanh toán viện phí
+    → 3 questions generated
+  [441/472] Tại sao không hiển thị thông tin BN trong bảng thống kê tổng hợp dịch vụ kỹ thuật sử dụng?
+    → 1 questions generated
+  [442/472] Hướng dẫn thống kê báo cáo tổng hợp dịch vụ kỹ thuật sử dụng
+    → 4 questions generated
+  [443/472] Tại sao không sửa được kết luận dịch vụ CDHA và thăm dò chức năng?
+    → 3 questions generated
+  [444/472] Hướng dẫn cách sửa kết luận dịch vụ CDHA và thăm dò chức năng (Chưa trả kết quả)
+    → 3 questions generated
+  [445/472] Hướng dẫn cách sửa kết luận dịch vụ CDHA và thăm dò chức năng (Đã trả kết quả)
+    → 3 questions generated
+  [446/472] Cách in báo cáo PTTT theo tháng
+    → 1 questions generated
+  [447/472] Lấy báo cáo thống kê số lượng dịch
+    → 3 questions generated
+  [448/472] in phiếu hướng dẫn thực hiện cận lâm sàng ở đâu
+    → 3 questions generated
+  [449/472] các thao tác để kê dịch vụ giường cho bệnh nhân
+    → 3 questions generated
+  [450/472] Làm thế nào để nhập thông tin tai nạn thương tích
+    → 3 questions generated
+  [451/472] tại sao phòng khám mới 18 bệnh nhân mà số thứ tự đi xét nghiệm là 250
+    → 1 questions generated
+  [452/472] Cách sửa chấn đoán bệnh khám bệnh
+    → 3 questions generated
+  [453/472] Thống kê danh sách bệnh nhân phẫu thuật thủ thuật
+    → 4 questions generated
+  [454/472] In sổ lưu kết quả chẩn đoán hình ảnh
+    → 3 questions generated
+  [455/472] In bảng y lệnh thuốc hàng ngày
+    → 3 questions generated
+  [456/472] In bảng y lệnh vật tư hàng ngày như nào?
+    → 3 questions generated
+  [457/472] Hướng dẫn chuyển phòng cho bệnh nhân
+    → 3 questions generated
+  [458/472] để xem ảnh CT và XQ, siêu âm pacs thao tác như nào
+    → 3 questions generated
+  [459/472] Tại sao hệ thống không cho sửa các nội dung trong vỏ bệnh án
+    → 4 questions generated
+  [460/472] Việc bỏ thời gian thực trên mẫu chữ ký điện tử có phù hợp với quy định hiện hành không?
+    → 3 questions generated
+  [461/472] Lỗi thanh toán QR động thường do những nguyên nhân nảo?
+    → 4 questions generated
+  [462/472] Tại sao bác sĩ không Xác nhận được nội dung đã nhập trong phiếu Khám sức khoẻ?
+    → 3 questions generated
+  [463/472] Lỗi khi nhập mô tả kết quả CĐHA phần mềm thông báo The file exists
+    → 3 questions generated
+  [464/472] xem báo cáo số lượng bệnh nhân thực hiện tại phòng xét nghiệm như nào?
+  [RETRY 1/3] xem báo cáo số lượng bệnh nhân thực hiện tại phòng xét nghiệm như nào?
+  [RETRY 2/3] xem báo cáo số lượng bệnh nhân thực hiện tại phòng xét nghiệm như nào?
+  [WARN] Generation failed after 3 retries for 'xem báo cáo số lượng bệnh nhân thực hiện tại phòng xét nghiệm như nào?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [465/472] Lỗi phiếu chuyên khoa có ngày y lệnh lớn hơn thời gian bắt đầu và kết thúc dịch vụ
+  [RETRY 1/3] Lỗi phiếu chuyên khoa có ngày y lệnh lớn hơn thời gian bắt đầu và kết thúc dịch vụ
+  [RETRY 2/3] Lỗi phiếu chuyên khoa có ngày y lệnh lớn hơn thời gian bắt đầu và kết thúc dịch vụ
+  [WARN] Generation failed after 3 retries for 'Lỗi phiếu chuyên khoa có ngày y lệnh lớn hơn thời gian bắt đầu và kết thúc dịch vụ': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [466/472] Lỗi phiếu điều trị có thời gian sau thời gian xử trí
+  [RETRY 1/3] Lỗi phiếu điều trị có thời gian sau thời gian xử trí
+  [RETRY 2/3] Lỗi phiếu điều trị có thời gian sau thời gian xử trí
+  [WARN] Generation failed after 3 retries for 'Lỗi phiếu điều trị có thời gian sau thời gian xử trí': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [467/472] Xem tồn kho thuốc ở đâu?
+  [RETRY 1/3] Xem tồn kho thuốc ở đâu?
+  [RETRY 2/3] Xem tồn kho thuốc ở đâu?
+  [WARN] Generation failed after 3 retries for 'Xem tồn kho thuốc ở đâu?': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [468/472] Cách sửa thông tin bên trong bệnh án sau khi đã kết thúc điều trị/ xử trí bệnh án
+  [RETRY 1/3] Cách sửa thông tin bên trong bệnh án sau khi đã kết thúc điều trị/ xử trí bệnh án
+  [RETRY 2/3] Cách sửa thông tin bên trong bệnh án sau khi đã kết thúc điều trị/ xử trí bệnh án
+  [WARN] Generation failed after 3 retries for 'Cách sửa thông tin bên trong bệnh án sau khi đã kết thúc điều trị/ xử trí bệnh án': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [469/472] Cách sử dụng tài liệu tuỳ biến
+  [RETRY 1/3] Cách sử dụng tài liệu tuỳ biến
+  [RETRY 2/3] Cách sử dụng tài liệu tuỳ biến
+  [WARN] Generation failed after 3 retries for 'Cách sử dụng tài liệu tuỳ biến': APIConnectionError: Connection error.
+    → SKIPPED (no questions generated)
+  [470/472] Cách chỉ định dịch vụ
+  [RETRY 1/3] Cách chỉ định dịch vụ
+    → 3 questions generated
+  [471/472] Đăng ký khám bằng mã vạch BHYT
+    → 4 questions generated
+  [472/472] In phiếu hướng dẫn thực hiện cận lâm sàng
+    → 3 questions generated
+
+[GENERATE] Done. 1235 training pairs saved to /home/phungkien/EHC_HELPDESK/ehc-helpdesk/data/finetune_pairs.jsonl
+
+[DONE] Training data generated. Run without --generate-only to fine-tune.
+       (Stop vLLM first to free memory for fine-tuning on CPU)

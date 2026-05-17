@@ -1,0 +1,11 @@
+[0;1;32m●[0m ehc-vllm.service - EHC vLLM Server
+     Loaded: loaded (]8;;file://ehcaihelpdeskserver/etc/systemd/system/ehc-vllm.service/etc/systemd/system/ehc-vllm.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;32mactive (running)[0m since Thu 2026-05-14 21:37:04 +07; 5s ago
+   Main PID: 23187 (pt_main_thread)
+      Tasks: 58 (limit: 154303)
+     Memory: 415.3M (peak: 416.3M)
+        CPU: 11.674s
+     CGroup: /system.slice/ehc-vllm.service
+             └─[0;38;5;245m23187 /usr/bin/python3 -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct --host 0.0.0.0 --port 8000 --tensor-parallel-size 2 --load-format safetensors --dtype half --gpu-memory-utilization 0.90 --no-use-ray --no-use-ray[0m
+
+May 14 21:37:04 ehcaihelpdeskserver systemd[1]: Started ehc-vllm.service - EHC vLLM Server.
