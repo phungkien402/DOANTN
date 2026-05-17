@@ -58,6 +58,7 @@ class AgentState(TypedDict):
     session_history: list         # conversation history
     session_id: str               # needed to look up clarification count
     clarification_count: int      # how many times we've asked for clarification
+    answerable: str               # "yes" | "no" | "unclear" from analyze_and_rewrite
 
 
 # --- Maintenance mode (same as pipeline.py) ---
@@ -122,19 +123,21 @@ def node_retriever(state: AgentState) -> dict:
     query = state["query"]
     print(f"[AGENT] Node: Retriever | query=\"{query}\"")
 
-    chunks, rewritten, user_intent = search_faq(query)
+    chunks, rewritten, user_intent, answerable = search_faq(query)
 
-    print(f"[AGENT] Node: Retriever | rewritten=\"{rewritten}\"")
+    print(f"[AGENT] Node: Retriever | rewritten=\"{rewritten}\" | answerable={answerable}")
     return {
         "chunks": chunks,
         "rewritten_query": rewritten,
         "user_intent": user_intent,
+        "answerable": answerable,
     }
 
 
 def node_synthesizer(state: AgentState) -> dict:
     """Check confidence of retrieved chunks and decide next route."""
     chunks = state["chunks"]
+    answerable = state.get("answerable", "unclear")
     session_id = state.get("session_id", "")
 
     if not chunks:
@@ -142,22 +145,23 @@ def node_synthesizer(state: AgentState) -> dict:
     else:
         top_score = chunks[0].score
 
-    is_confident = chunks and confidence.is_confident(chunks[0], threshold=CONFIDENCE_THRESHOLD)
+    print(f"[AGENT] Node: Synthesizer | answerable={answerable} confidence={top_score:.4f}")
 
-    if is_confident:
-        print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → CONFIDENT")
+    # Primary: LLM judgment
+    if answerable == "yes" or (answerable == "unclear" and top_score >= CONFIDENCE_THRESHOLD):
+        print(f"[AGENT] Node: Synthesizer → CONFIDENT")
         return {
             "confidence": top_score,
             "intent": "search_faq",
         }
+
+    # Low: check clarification count
+    count = _session_mgr.get_clarification_count(session_id) if _session_mgr else 0
+    print(f"[AGENT] Node: Synthesizer → LOW | clarification_count={count}")
+    if count >= 3:
+        return {"confidence": top_score, "intent": "create_ticket"}
     else:
-        # Check how many times we've already asked for clarification
-        count = _session_mgr.get_clarification_count(session_id) if _session_mgr else 0
-        print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → LOW | clarification_count={count}")
-        if count >= 3:
-            return {"confidence": top_score, "intent": "create_ticket"}
-        else:
-            return {"confidence": top_score, "intent": "clarify"}
+        return {"confidence": top_score, "intent": "clarify"}
 
 
 def node_generator(state: AgentState) -> dict:
@@ -333,6 +337,7 @@ def run(message: Message, session_history: list) -> Answer:
         "session_history": session_history,
         "session_id": message.session_id,
         "clarification_count": 0,
+        "answerable": "unclear",
     }
 
     result = app.invoke(initial_state)

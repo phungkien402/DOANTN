@@ -16,7 +16,7 @@ from core.query_rewriter import analyze_and_rewrite
 from core.generator import LLMUnavailableError
 
 
-def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None]:
+def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None, str]:
     """
     Execute the full RAG search pipeline:
       1. Fast retrieve (top 3, no rerank) for initial context
@@ -24,7 +24,7 @@ def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None]:
       3. Full retrieve (top K) with rewritten query
       4. Rerank (top N)
 
-    Returns: (ranked_chunks, rewritten_query, user_intent)
+    Returns: (ranked_chunks, rewritten_query, user_intent, answerable)
     If vLLM is unavailable for rewrite, uses original query.
     """
     print(f"[SEARCH_FAQ] Starting search for: \"{query}\"")
@@ -37,14 +37,16 @@ def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None]:
     print(f"[SEARCH_FAQ] Step 2: Analyze + Rewrite")
     user_intent = None
     rewritten = query
+    answerable = "unclear"
     try:
         if fast_chunks:
-            user_intent, rewritten = analyze_and_rewrite(query, chunks=fast_chunks)
+            user_intent, rewritten, answerable = analyze_and_rewrite(query, chunks=fast_chunks)
         else:
-            user_intent, rewritten = analyze_and_rewrite(query)
+            user_intent, rewritten, answerable = analyze_and_rewrite(query)
     except LLMUnavailableError:
         print("[SEARCH_FAQ] vLLM unavailable for rewrite, using original query")
         rewritten = query
+        answerable = "unclear"
 
     # Step 3: Full retrieve with rewritten query
     print(f"[SEARCH_FAQ] Step 3: Full retrieve (top {RETRIEVER_TOP_K})")
@@ -52,23 +54,24 @@ def search_faq(query: str) -> tuple[list[RetrievedChunk], str, str | None]:
 
     if not chunks:
         print("[SEARCH_FAQ] No chunks retrieved")
-        return [], rewritten, user_intent
+        return [], rewritten, user_intent, answerable
 
     # Step 4: Rerank
     print(f"[SEARCH_FAQ] Step 4: Rerank (top {RERANKER_TOP_N})")
     ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
 
-    print(f"[SEARCH_FAQ] Done: {len(ranked_chunks)} chunks, rewritten=\"{rewritten}\"")
-    return ranked_chunks, rewritten, user_intent
+    print(f"[SEARCH_FAQ] Done: {len(ranked_chunks)} chunks, rewritten=\"{rewritten}\", answerable={answerable}")
+    return ranked_chunks, rewritten, user_intent, answerable
 
 
 if __name__ == "__main__":
     print("=== search_faq.py standalone test ===\n")
     test_query = "không in được phiếu thu"
-    chunks, rewritten, intent = search_faq(test_query)
+    chunks, rewritten, intent, answerable = search_faq(test_query)
     print(f"\nResults:")
     print(f"  Rewritten: \"{rewritten}\"")
     print(f"  Intent: \"{intent}\"")
+    print(f"  Answerable: \"{answerable}\"")
     print(f"  Chunks: {len(chunks)}")
     for i, c in enumerate(chunks, 1):
         print(f"    #{i} score={c.score:.4f} | {c.metadata.get('subject', 'N/A')}")
