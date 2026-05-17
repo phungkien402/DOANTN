@@ -45,7 +45,7 @@ RERANKER_MODEL = _get("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
 
 # --- Qdrant ---
 QDRANT_URL = _get("QDRANT_URL", "http://localhost:6333")
-QDRANT_COLLECTION = _get("QDRANT_COLLECTION", "ehc_faq")
+QDRANT_COLLECTION = _get("QDRANT_COLLECTION", "doantn_faq")
 
 # --- RAG settings ---
 RETRIEVER_TOP_K = int(_get("RETRIEVER_TOP_K", "10"))
