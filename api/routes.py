@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import SESSION_MAX_TURNS, ADMIN_TOKEN
 from core.models import Message
-from core.langgraph_agent import run as run_pipeline, set_maintenance_mode, is_maintenance_mode
+from core.langgraph_agent import run as run_pipeline, set_maintenance_mode, is_maintenance_mode, set_session_manager
 from api.session import SessionManager
 from api.logger import QueryLogger
 from adapters.telegram_adapter import TelegramAdapter
@@ -39,7 +39,8 @@ app.add_middleware(
 )
 
 # Shared instances
-_session_mgr = SessionManager(max_turns=SESSION_MAX_TURNS)
+_session_mgr = SessionManager(max_turns=SESSION_MAX_TURNS, ttl_seconds=1800)
+set_session_manager(_session_mgr)
 _logger = QueryLogger()
 
 # Adapter registry

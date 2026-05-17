@@ -29,13 +29,25 @@ from core.tools.create_ticket import save_ticket
 from core import generator, confidence
 
 
+# --- Session manager injection (set from api/routes.py to avoid circular imports) ---
+
+_session_mgr = None
+
+
+def set_session_manager(mgr):
+    """Inject the SessionManager instance from api/routes.py."""
+    global _session_mgr
+    _session_mgr = mgr
+    print("[AGENT] SessionManager injected")
+
+
 # --- State schema ---
 
 class AgentState(TypedDict):
     query: str                    # original user query
     expanded_query: str           # after abbreviation expansion (use query if no expansion)
     is_ehc_related: bool
-    intent: str                   # "search_faq" | "create_ticket" | "chat_fallback"
+    intent: str                   # "search_faq" | "create_ticket" | "chat_fallback" | "clarify"
     rewritten_query: str
     tool_called: str              # actual tool that ran
     chunks: list                  # list of RetrievedChunk
@@ -44,6 +56,8 @@ class AgentState(TypedDict):
     ticket_id: Optional[int]
     user_intent: Optional[str]    # intent description from analyze_and_rewrite
     session_history: list         # conversation history
+    session_id: str               # needed to look up clarification count
+    clarification_count: int      # how many times we've asked for clarification
 
 
 # --- Maintenance mode (same as pipeline.py) ---
@@ -121,16 +135,14 @@ def node_retriever(state: AgentState) -> dict:
 def node_synthesizer(state: AgentState) -> dict:
     """Check confidence of retrieved chunks and decide next route."""
     chunks = state["chunks"]
+    session_id = state.get("session_id", "")
 
     if not chunks:
-        print(f"[AGENT] Node: Synthesizer | no chunks → LOW confidence")
-        return {
-            "confidence": 0.0,
-            "intent": "create_ticket",
-        }
+        top_score = 0.0
+    else:
+        top_score = chunks[0].score
 
-    top_score = chunks[0].score
-    is_confident = confidence.is_confident(chunks[0], threshold=CONFIDENCE_THRESHOLD)
+    is_confident = chunks and confidence.is_confident(chunks[0], threshold=CONFIDENCE_THRESHOLD)
 
     if is_confident:
         print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → CONFIDENT")
@@ -139,11 +151,13 @@ def node_synthesizer(state: AgentState) -> dict:
             "intent": "search_faq",
         }
     else:
-        print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → LOW")
-        return {
-            "confidence": top_score,
-            "intent": "create_ticket",
-        }
+        # Check how many times we've already asked for clarification
+        count = _session_mgr.get_clarification_count(session_id) if _session_mgr else 0
+        print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → LOW | clarification_count={count}")
+        if count >= 3:
+            return {"confidence": top_score, "intent": "create_ticket"}
+        else:
+            return {"confidence": top_score, "intent": "clarify"}
 
 
 def node_generator(state: AgentState) -> dict:
@@ -152,6 +166,7 @@ def node_generator(state: AgentState) -> dict:
     chunks = state["chunks"]
     session_history = state.get("session_history", [])
     user_intent = state.get("user_intent")
+    session_id = state.get("session_id", "")
 
     print(f"[AGENT] Node: Generator | chunks={len(chunks)}")
 
@@ -166,6 +181,10 @@ def node_generator(state: AgentState) -> dict:
             "vui lòng thử lại sau 1–2 phút. Nếu vẫn lỗi, liên hệ bộ phận IT để kiểm tra server."
         )
 
+    # Reset clarification count after successful confident answer
+    if _session_mgr and session_id:
+        _session_mgr.reset_clarification(session_id)
+
     print(f"[AGENT] Node: Generator | answer_len={len(answer_text)}")
     return {"answer": answer_text}
 
@@ -174,10 +193,19 @@ def node_ticket_creator(state: AgentState) -> dict:
     """Create a ticket for low-confidence queries."""
     query = state["query"]
     user_intent = state.get("user_intent")
+    session_id = state.get("session_id", "")
     print(f"[AGENT] Node: TicketCreator | query=\"{query}\"")
 
     ticket_id = save_ticket(query, user_intent=user_intent)
-    answer = f"Đã ghi nhận sự cố, mã ticket: #{ticket_id}"
+
+    # Reset clarification count after ticket creation
+    if _session_mgr and session_id:
+        _session_mgr.reset_clarification(session_id)
+
+    answer = (
+        f"Mình đã ghi nhận vấn đề của bạn do vấn đề này chưa có trong cơ sở dữ liệu của mình (ticket #{ticket_id}). "
+        "Vui lòng nhắn lại yêu cầu vào nhóm Zalo hỗ trợ để được nhân viên kỹ thuật giải đáp."
+    )
 
     print(f"[AGENT] Node: TicketCreator | ticket_id={ticket_id}")
     return {
@@ -197,6 +225,31 @@ def node_chat_fallback(state: AgentState) -> dict:
     return {"answer": answer}
 
 
+def node_clarifier(state: AgentState) -> dict:
+    """Ask user for more detail (no LLM call — template only)."""
+    session_id = state.get("session_id", "")
+    user_intent = state.get("user_intent") or state["query"]
+
+    count = _session_mgr.increment_clarification(session_id) if _session_mgr else 1
+
+    print(f"[AGENT] Node: Clarifier | count={count}")
+
+    if count == 1:
+        answer = (
+            f"Mình chưa tìm được thông tin phù hợp về: \"{user_intent}\".\n"
+            "Bạn có thể mô tả chi tiết hơn không? "
+            "Ví dụ: lỗi xảy ra ở module nào, màn hình hiển thị thông báo gì?"
+        )
+    else:
+        answer = (
+            "Mình vẫn chưa tìm được câu trả lời phù hợp. "
+            "Bạn có thể cung cấp thêm thông tin không? "
+            "Ví dụ: tên chức năng đang dùng, các bước đã thực hiện trước khi gặp lỗi."
+        )
+
+    return {"answer": answer, "tool_called": "clarifier"}
+
+
 # --- Graph wiring ---
 
 graph = StateGraph(AgentState)
@@ -209,6 +262,7 @@ graph.add_node("synthesizer", node_synthesizer)
 graph.add_node("generator", node_generator)
 graph.add_node("ticket_creator", node_ticket_creator)
 graph.add_node("chat_fallback", node_chat_fallback)
+graph.add_node("clarifier", node_clarifier)
 
 # Set entry point
 graph.set_entry_point("query_analyzer")
@@ -224,7 +278,11 @@ graph.add_conditional_edges(
 )
 graph.add_conditional_edges(
     "synthesizer",
-    lambda s: "ticket_creator" if s["intent"] == "create_ticket" else "generator"
+    lambda s: {
+        "create_ticket": "ticket_creator",
+        "search_faq": "generator",
+        "clarify": "clarifier",
+    }[s["intent"]]
 )
 
 # Linear edges
@@ -232,6 +290,7 @@ graph.add_edge("retriever", "synthesizer")
 graph.add_edge("generator", END)
 graph.add_edge("ticket_creator", END)
 graph.add_edge("chat_fallback", END)
+graph.add_edge("clarifier", END)
 
 # Compile the graph
 app = graph.compile()
@@ -272,6 +331,8 @@ def run(message: Message, session_history: list) -> Answer:
         "ticket_id": None,
         "user_intent": None,
         "session_history": session_history,
+        "session_id": message.session_id,
+        "clarification_count": 0,
     }
 
     result = app.invoke(initial_state)
@@ -279,7 +340,7 @@ def run(message: Message, session_history: list) -> Answer:
     # Build Answer object
     chunks = result.get("chunks", [])
     conf = result.get("confidence", 0.0)
-    is_fallback = result.get("intent") in ("chat_fallback", "create_ticket")
+    is_fallback = result.get("intent") in ("chat_fallback", "create_ticket", "clarify")
     rewritten = result.get("rewritten_query", "")
 
     answer = Answer(
@@ -297,6 +358,11 @@ def run(message: Message, session_history: list) -> Answer:
 
 if __name__ == "__main__":
     print("=== LangGraph Agent — Standalone Test ===\n")
+
+    # Set up a local session manager for standalone testing
+    from api.session import SessionManager
+    _test_mgr = SessionManager(max_turns=5, ttl_seconds=1800)
+    set_session_manager(_test_mgr)
 
     test_queries = [
         ("không in được phiếu thu", "EHC question → search_faq → generator"),
