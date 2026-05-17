@@ -137,11 +137,21 @@ def node_tool_router(state: AgentState) -> dict:
 def node_retriever(state: AgentState) -> dict:
     """Execute the full RAG search pipeline."""
     query = state["query"]
+    session_id = state.get("session_id", "")
     session_history = state.get("session_history", [])
     print(f"[AGENT] Node: Retriever | query=\"{query}\"")
 
+    # If in clarification loop, reuse saved fast_chunks — don't retrieve with short answer like "2"
+    saved_fast_chunks = None
+    if _session_mgr:
+        count = _session_mgr.get_clarification_count(session_id)
+        if count > 0:
+            saved_fast_chunks = _session_mgr.get_fast_chunks(session_id)
+            if saved_fast_chunks:
+                print(f"[AGENT] Node: Retriever | reusing {len(saved_fast_chunks)} saved fast_chunks")
+
     chunks, rewritten, user_intent, answerable, fast_chunks = search_faq(
-        query, session_history=session_history
+        query, session_history=session_history, saved_fast_chunks=saved_fast_chunks
     )
 
     print(f"[AGENT] Node: Retriever | rewritten=\"{rewritten}\" | answerable={answerable}")
@@ -266,6 +276,10 @@ def node_clarifier(state: AgentState) -> dict:
     query = state["query"]
     fast_chunks = state.get("fast_chunks", [])
     count = _session_mgr.increment_clarification(session_id) if _session_mgr else 1
+
+    # Save fast_chunks so next turn can reuse them instead of re-retrieving with "2"
+    if _session_mgr and fast_chunks:
+        _session_mgr.set_fast_chunks(session_id, fast_chunks)
 
     print(f"[AGENT] Node: Clarifier | count={count} | chunks={len(fast_chunks)}")
 

@@ -21,6 +21,7 @@ class SessionManager:
     def __init__(self, max_turns: int = 10, ttl_seconds: int = 1800):
         self._sessions: dict[str, list[dict]] = {}
         self._clarification_counts: dict[str, int] = {}
+        self._fast_chunks: dict[str, list] = {}
         self._last_active: dict[str, float] = {}
         self._max_turns = max_turns
         self._ttl = ttl_seconds
@@ -59,14 +60,27 @@ class SessionManager:
         self._last_active[session_id] = time.time()
         return count
 
+    def set_fast_chunks(self, session_id: str, chunks: list) -> None:
+        """Save fast_chunks for reuse in the next clarification turn."""
+        self._check_ttl(session_id)
+        self._fast_chunks[session_id] = chunks
+        self._last_active[session_id] = time.time()
+
+    def get_fast_chunks(self, session_id: str) -> list:
+        """Retrieve saved fast_chunks for a session."""
+        self._check_ttl(session_id)
+        return self._fast_chunks.get(session_id, [])
+
     def reset_clarification(self, session_id: str) -> None:
-        """Reset clarification count (after confident answer or ticket creation)."""
+        """Reset clarification count and saved fast_chunks (after confident answer or ticket creation)."""
         self._clarification_counts.pop(session_id, None)
+        self._fast_chunks.pop(session_id, None)
 
     def clear(self, session_id: str) -> None:
         """Clear a session's history and all tracking data."""
         self._sessions.pop(session_id, None)
         self._clarification_counts.pop(session_id, None)
+        self._fast_chunks.pop(session_id, None)
         self._last_active.pop(session_id, None)
 
 

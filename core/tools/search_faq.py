@@ -16,10 +16,11 @@ from core.query_rewriter import analyze_and_rewrite
 from core.generator import LLMUnavailableError
 
 
-def search_faq(query: str, session_history: list = None) -> tuple[list[RetrievedChunk], str, str | None, str, list[RetrievedChunk]]:
+def search_faq(query: str, session_history: list = None, saved_fast_chunks: list = None) -> tuple[list[RetrievedChunk], str, str | None, str, list[RetrievedChunk]]:
     """
     Execute the full RAG search pipeline:
       1. Fast retrieve (top 3, no rerank) for initial context
+         — skipped if saved_fast_chunks provided (clarification loop reuse)
       2. Analyze + rewrite query (single LLM call)
       3. Full retrieve (top K) with rewritten query  [skipped if answerable=unclear/no]
       4. Rerank (top N)                              [skipped if answerable=unclear/no]
@@ -30,9 +31,13 @@ def search_faq(query: str, session_history: list = None) -> tuple[list[Retrieved
     """
     print(f"[SEARCH_FAQ] Starting search for: \"{query}\"")
 
-    # Step 1: Fast retrieve — top 3 for context
-    print(f"[SEARCH_FAQ] Step 1: Fast retrieve (top 3)")
-    fast_chunks = retriever.retrieve(query, top_k=3)
+    # Step 1: Fast retrieve — skip if we have saved chunks from clarification
+    if saved_fast_chunks:
+        print(f"[SEARCH_FAQ] Step 1: Reusing {len(saved_fast_chunks)} saved fast_chunks from clarification")
+        fast_chunks = saved_fast_chunks
+    else:
+        print(f"[SEARCH_FAQ] Step 1: Fast retrieve (top 3)")
+        fast_chunks = retriever.retrieve(query, top_k=3)
 
     # Step 2: Analyze + rewrite
     print(f"[SEARCH_FAQ] Step 2: Analyze + Rewrite")
