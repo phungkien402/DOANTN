@@ -93,7 +93,18 @@ def is_maintenance_mode() -> bool:
 def node_query_analyzer(state: AgentState) -> dict:
     """Classify query: EHC-related or off-topic."""
     query = state["query"]
+    session_id = state.get("session_id", "")
     print(f"\n[AGENT] Node: QueryAnalyzer | query=\"{query}\"")
+
+    # If user is in clarification loop, bypass classifier
+    if _session_mgr:
+        count = _session_mgr.get_clarification_count(session_id)
+        if count > 0:
+            print(f"[AGENT] Classifier: BYPASS (clarification_count={count})")
+            return {
+                "is_ehc_related": True,
+                "intent": "search_faq",
+            }
 
     is_off_topic = classify(query)
 
