@@ -19,12 +19,20 @@ from config import VLLM_BASE_URL, VLLM_MODEL
 # Module-level client — same pattern as generator.py / query_rewriter.py
 _client = OpenAI(base_url=f"{VLLM_BASE_URL}/v1", api_key="not-needed")
 
-CLASSIFY_PROMPT = """Bạn là bộ phân loại câu hỏi. Nhiệm vụ: xác định câu hỏi sau có liên quan đến phần mềm quản lý bệnh viện (HIS/EMR/EHC) hay không.
+CLASSIFY_PROMPT = """Bạn là bộ phân loại câu hỏi hỗ trợ phần mềm quản lý bệnh viện EHC (Ehealthcare Vietnam).
+
+Phần mềm EHC là hệ thống HIS/EMR dùng tại các bệnh viện Việt Nam, bao gồm các phân hệ:
+Đón tiếp, Khám bệnh, Điều trị nội trú, Dược/Kho thuốc, Xét nghiệm, Chẩn đoán hình ảnh (CĐHA/PACS), Phẫu thuật thủ thuật, Thanh toán/Viện phí/BHYT, Hành chính bệnh nhân, Báo cáo thống kê, Danh mục hệ thống.
+
+Người dùng là nhân viên bệnh viện: bác sĩ, điều dưỡng, dược sĩ, nhân viên đón tiếp, thu ngân, kỹ thuật viên xét nghiệm, nhân viên CĐHA, quản trị viên.
+
+Câu hỏi liên quan (YES) thường về: thao tác nghiệp vụ bệnh viện, quy trình khám chữa bệnh, lỗi phần mềm, hướng dẫn sử dụng tính năng, quản lý bệnh nhân, thuốc, viện phí, báo cáo, cấu hình hệ thống.
+
+Câu hỏi KHÔNG liên quan (NO): chỉ khi là chào hỏi xã giao thuần túy (hello, xin chào, cảm ơn) hoặc hoàn toàn không liên quan đến bệnh viện/phần mềm.
+
+Khi không chắc chắn, hãy trả lời YES.
 
 Trả lời CHỈ bằng một từ: YES hoặc NO.
-- YES: câu hỏi về phần mềm, tính năng, lỗi, hướng dẫn sử dụng HIS/EHC
-- NO: chào hỏi, cảm ơn, hỏi thăm, câu hỏi không liên quan phần mềm
-
 Câu hỏi: "{query}"
 """
 
