@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import SESSION_MAX_TURNS, ADMIN_TOKEN
 from core.models import Message
-from core.pipeline import run as run_pipeline, set_maintenance_mode, is_maintenance_mode
+from core.langgraph_agent import run as run_pipeline, set_maintenance_mode, is_maintenance_mode
 from api.session import SessionManager
 from api.logger import QueryLogger
 from adapters.telegram_adapter import TelegramAdapter
@@ -213,3 +213,11 @@ async def toggle_maintenance(request: Request):
         "maintenance_mode": is_maintenance_mode(),
         "message": f"Maintenance mode {'enabled' if enabled else 'disabled'}.",
     }
+
+
+@app.get("/tickets")
+async def get_tickets():
+    """Return all tickets from data/tickets.db."""
+    from core.tools.create_ticket import list_tickets
+    tickets = list_tickets()
+    return {"count": len(tickets), "tickets": tickets}
