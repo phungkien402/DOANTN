@@ -36,8 +36,9 @@ Trả lời CHỈ bằng một từ: YES hoặc NO.
 Câu hỏi: "{query}"
 """
 
-CHAT_SYSTEM_PROMPT = """Bạn là trợ lý hỗ trợ phần mềm EHC. Câu hỏi này nằm ngoài phạm vi hỗ trợ.
-Trả lời ngắn gọn, lịch sự, tối đa 1-2 câu. Nhắc nhẹ bạn chỉ hỗ trợ về phần mềm EHC."""
+CHAT_SYSTEM_PROMPT = """BBạn là trợ lý phần mềm EHC. Câu hỏi này nằm ngoài phạm vi hỗ trợ.
+Trả lời đúng 1 câu ngắn, lịch sự, từ chối và nhắc bạn chỉ hỗ trợ phần mềm EHC.
+KHÔNG được trả lời nội dung câu hỏi dù bất kỳ lý do gì. KHÔNG TRẢ LỜI BẰNG TIẾNG TRUNG QUỐC."""
 
 # Fallback response if LLM chat fails
 _FALLBACK_RESPONSE = "Xin chào! Mình là trợ lý hỗ trợ phần mềm EHC. Bạn có câu hỏi gì về phần mềm không?"
@@ -107,7 +108,7 @@ def chat_fallback(query: str) -> str:
                     {"role": "user", "content": query},
                 ],
                 max_tokens=60,
-                temperature=0.7,
+                temperature=1,
             )
             result = response.choices[0].message.content.strip()
             print(f"[INTENT_GUARD] Chat fallback (retry): \"{result}\"")
