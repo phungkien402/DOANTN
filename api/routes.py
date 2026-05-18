@@ -226,6 +226,25 @@ async def get_tickets():
     return {"count": len(tickets), "tickets": tickets}
 
 
+@app.get("/unanswered")
+async def list_unanswered():
+    """Return all entries from data/unanswered.jsonl (newest first)."""
+    import json as _json
+    path = Path(__file__).parent.parent / "data" / "unanswered.jsonl"
+    if not path.exists():
+        return []
+    entries = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(_json.loads(line))
+                except _json.JSONDecodeError:
+                    pass
+    return list(reversed(entries))
+
+
 # --- Trace endpoints ---
 
 @app.get("/traces")

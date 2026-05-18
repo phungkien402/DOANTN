@@ -267,7 +267,12 @@ def node_ticket_creator(state: AgentState) -> dict:
     user_intent = state.get("user_intent")
     print(f"[AGENT] Node: TicketCreator | query=\"{query}\"")
 
-    ticket_id = save_ticket(query, user_intent=user_intent)
+    ticket_id = save_ticket(
+        query,
+        user_intent=user_intent,
+        rewritten_query=state.get("rewritten_query", ""),
+        confidence=state.get("confidence", 0.0),
+    )
 
     answer = (
         f"Mình đã ghi nhận vấn đề của bạn do vấn đề này chưa có trong cơ sở dữ liệu của mình (ticket #{ticket_id}). "
