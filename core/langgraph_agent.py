@@ -130,7 +130,7 @@ def node_tool_router(state: AgentState) -> dict:
 
 
 def node_fast_retriever(state: AgentState) -> dict:
-    """Fast retrieve top 3 chunks (no rerank) for orchestrator context."""
+    """Fast retrieve top chunks from BOTH collections for orchestrator context."""
     query = state["query"]
     session_id = state.get("session_id", "")
     print(f"[AGENT] Node: FastRetriever | query=\"{query}\"")
@@ -144,10 +144,21 @@ def node_fast_retriever(state: AgentState) -> dict:
 
     # Expand abbreviations before retrieval
     expanded = expand_abbreviations(query)
-    fast_chunks = retriever.retrieve(expanded, top_k=3)
 
-    print(f"[AGENT] Node: FastRetriever | {len(fast_chunks)} chunks retrieved")
-    return {"fast_chunks": fast_chunks}
+    # Query both collections
+    from core.tools.search_manual import _retrieve_manual
+    faq_chunks = retriever.retrieve(expanded, top_k=2)
+    manual_chunks = _retrieve_manual(expanded, top_k=2)
+
+    # Merge and sort by score, take top 4
+    all_chunks = sorted(faq_chunks + manual_chunks, key=lambda c: c.score, reverse=True)[:4]
+
+    for i, c in enumerate(all_chunks, 1):
+        src = c.metadata.get("source", "faq")
+        print(f"[RETRIEVER] #{i} score={c.score:.3f} [{src}] | {c.metadata.get('subject','')[:60]}")
+
+    print(f"[AGENT] Node: FastRetriever | {len(all_chunks)} chunks (faq+manual)")
+    return {"fast_chunks": all_chunks}
 
 
 def node_orchestrator(state: AgentState) -> dict:
