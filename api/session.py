@@ -2,9 +2,8 @@
 Session Manager — stores per-user conversation history in memory.
 
 Used by:
-  - Fallback Handler: to know if clarification was already asked
-  - Pipeline: to provide multi-turn context if needed
-  - Clarification loop: tracks how many times we've asked for more detail
+  - Pipeline: to provide multi-turn context to the orchestrator
+  - Routes: to store user/bot turns
 
 Limits history to SESSION_MAX_TURNS most recent turns.
 Auto-resets sessions idle longer than TTL.
@@ -20,8 +19,6 @@ class SessionManager:
 
     def __init__(self, max_turns: int = 10, ttl_seconds: int = 1800):
         self._sessions: dict[str, list[dict]] = {}
-        self._clarification_counts: dict[str, int] = {}
-        self._fast_chunks: dict[str, list] = {}
         self._last_active: dict[str, float] = {}
         self._max_turns = max_turns
         self._ttl = ttl_seconds
@@ -47,40 +44,9 @@ class SessionManager:
         self._sessions[session_id] = self._sessions[session_id][-self._max_turns:]
         self._last_active[session_id] = time.time()
 
-    def get_clarification_count(self, session_id: str) -> int:
-        """Get current clarification count for a session."""
-        self._check_ttl(session_id)
-        return self._clarification_counts.get(session_id, 0)
-
-    def increment_clarification(self, session_id: str) -> int:
-        """Increment and return new clarification count."""
-        self._check_ttl(session_id)
-        count = self._clarification_counts.get(session_id, 0) + 1
-        self._clarification_counts[session_id] = count
-        self._last_active[session_id] = time.time()
-        return count
-
-    def set_fast_chunks(self, session_id: str, chunks: list) -> None:
-        """Save fast_chunks for reuse in the next clarification turn."""
-        self._check_ttl(session_id)
-        self._fast_chunks[session_id] = chunks
-        self._last_active[session_id] = time.time()
-
-    def get_fast_chunks(self, session_id: str) -> list:
-        """Retrieve saved fast_chunks for a session."""
-        self._check_ttl(session_id)
-        return self._fast_chunks.get(session_id, [])
-
-    def reset_clarification(self, session_id: str) -> None:
-        """Reset clarification count and saved fast_chunks (after confident answer or ticket creation)."""
-        self._clarification_counts.pop(session_id, None)
-        self._fast_chunks.pop(session_id, None)
-
     def clear(self, session_id: str) -> None:
-        """Clear a session's history and all tracking data."""
+        """Clear a session's history."""
         self._sessions.pop(session_id, None)
-        self._clarification_counts.pop(session_id, None)
-        self._fast_chunks.pop(session_id, None)
         self._last_active.pop(session_id, None)
 
 
@@ -100,27 +66,14 @@ if __name__ == "__main__":
     sm.clear("s1")
     print(f"After clear: {sm.get_history('s1')}")
 
-    # Clarification count test
-    print("\n--- Clarification count test ---")
-    assert sm.get_clarification_count("s2") == 0
-    assert sm.increment_clarification("s2") == 1
-    assert sm.increment_clarification("s2") == 2
-    assert sm.increment_clarification("s2") == 3
-    assert sm.get_clarification_count("s2") == 3
-    sm.reset_clarification("s2")
-    assert sm.get_clarification_count("s2") == 0
-    print("Clarification counts: OK")
-
     # TTL test
     print("\n--- TTL test ---")
     sm_ttl = SessionManager(max_turns=5, ttl_seconds=1)
     sm_ttl.add_turn("t1", "user", "test")
-    sm_ttl.increment_clarification("t1")
-    assert sm_ttl.get_clarification_count("t1") == 1
-    print("Before TTL expiry: count=1")
+    assert sm_ttl.get_history("t1") != []
+    print("Before TTL expiry: has history")
     time.sleep(1.1)
     assert sm_ttl.get_history("t1") == []
-    assert sm_ttl.get_clarification_count("t1") == 0
     print("After TTL expiry: session cleared")
 
     print("\n✓ SessionManager works correctly.")

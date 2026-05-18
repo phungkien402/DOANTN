@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import SESSION_MAX_TURNS, ADMIN_TOKEN
 from core.models import Message
-from core.langgraph_agent import run as run_pipeline, set_maintenance_mode, is_maintenance_mode, set_session_manager
+from core.langgraph_agent import run as run_pipeline, set_maintenance_mode, is_maintenance_mode
 from api.session import SessionManager
 from api.logger import QueryLogger
 from adapters.telegram_adapter import TelegramAdapter
@@ -41,7 +41,6 @@ app.add_middleware(
 
 # Shared instances
 _session_mgr = SessionManager(max_turns=SESSION_MAX_TURNS, ttl_seconds=1800)
-set_session_manager(_session_mgr)
 set_telegram_session_mgr(_session_mgr)
 _logger = QueryLogger()
 
@@ -224,3 +223,31 @@ async def get_tickets():
     from core.tools.create_ticket import list_tickets
     tickets = list_tickets()
     return {"count": len(tickets), "tickets": tickets}
+
+
+# --- Trace endpoints ---
+
+@app.get("/traces")
+async def list_traces():
+    """Return recent run traces (last 50)."""
+    from core import tracer
+    return tracer.get_all()
+
+
+@app.get("/traces/{run_id}")
+async def get_trace(run_id: str):
+    """Return a single run trace by ID."""
+    from core import tracer
+    r = tracer.get_one(run_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return r
+
+
+@app.get("/traces-ui")
+async def traces_ui():
+    """Serve the traces dashboard."""
+    ui_path = Path(__file__).parent.parent / "static" / "traces.html"
+    if ui_path.exists():
+        return FileResponse(str(ui_path))
+    return JSONResponse({"error": "traces.html not found"}, status_code=404)
