@@ -47,21 +47,22 @@ CÂU HỎI HIỆN TẠI: {query}
 ---
 HƯỚNG DẪN QUYẾT ĐỊNH:
 
-1. Nếu từ câu hỏi + lịch sử + FAQ, bạn đủ tự tin xác định được vấn đề cụ thể người dùng gặp phải:
-   → action = "answer"
-   → search_query = câu truy vấn tối ưu để tìm kiếm câu trả lời (tiếng Việt, cụ thể, bỏ từ thừa)
+1. action = "answer" — khi BẤT KỲ điều kiện nào sau đây đúng:
+   - Chunk #1 có score > 0.45 VÀ tiêu đề chunk #1 đề cập đúng đối tượng/chủ thể người dùng nhắc đến
+     (ví dụ: user nói "bảng kê" → chunk #1 có "bảng kê"; user nói "tài liệu chưa ký" → chunk #1 có "chưa ký")
+   - Câu hỏi + lịch sử hội thoại đủ để xác định rõ vấn đề cụ thể, dù query chưa hoàn chỉnh
+   → search_query = câu truy vấn tối ưu để tìm kiếm (tiếng Việt, cụ thể, bỏ từ thừa như "mình", "ấy", "nhỉ")
 
-2. Nếu câu hỏi mơ hồ, nhiều FAQ có thể phù hợp, cần xác nhận thêm từ người dùng:
-   → action = "clarify"
-   → clarify_message = câu hỏi lại ngắn gọn, liệt kê các trường hợp có thể (dùng danh sách đánh số), hỏi người dùng thuộc trường hợp nào hoặc mô tả thêm
+2. action = "clarify" — CHỈ KHI CẢ HAI điều kiện sau đều đúng:
+   - Query hoàn toàn mơ hồ, không đề cập rõ chủ thể (ví dụ: "không in được", "bị lỗi", "không dùng được")
+   - Nhiều chunks có tiêu đề khác nhau đều có thể phù hợp
+   → clarify_message = liệt kê các trường hợp có thể theo danh sách đánh số, kết thúc bằng
+     "Nếu không có trường hợp nào phù hợp, bạn có thể mô tả chi tiết vấn đề bằng lời của mình."
+   → KHÔNG hỏi lại nếu lịch sử hội thoại cho thấy đã clarify 1 lần rồi — lúc đó dùng action="answer" hoặc "ticket"
 
-3. Nếu FAQ không liên quan đến vấn đề người dùng đang hỏi, hoặc vấn đề quá đặc thù không có trong tài liệu:
-   → action = "ticket"
-
-LƯU Ý QUAN TRỌNG:
-- Nếu lịch sử cho thấy đã hỏi lại 1 lần rồi, ưu tiên action="answer" hoặc "ticket", KHÔNG hỏi lại lần 3.
-- search_query phải bằng tiếng Việt, cụ thể, phản ánh đúng vấn đề người dùng.
-- clarify_message phải ngắn, thân thiện, kết thúc bằng "Nếu không có trường hợp nào phù hợp, bạn có thể mô tả chi tiết vấn đề bằng lời của mình."
+3. action = "ticket" — khi:
+   - Cả 3 chunks đều không liên quan đến vấn đề người dùng mô tả
+   - Hoặc lịch sử cho thấy đã clarify rồi nhưng vẫn không tìm được chunk phù hợp
 
 ---
 TRẢ LỜI THEO ĐỊNH DẠNG JSON (không giải thích thêm):
@@ -74,15 +75,16 @@ TRẢ LỜI THEO ĐỊNH DẠNG JSON (không giải thích thêm):
 
 
 def _format_chunks(chunks) -> str:
-    """Format fast_chunks for the orchestrator prompt."""
+    """Format fast_chunks for the orchestrator prompt, including scores."""
     if not chunks:
         return "(không có)"
     lines = []
     for i, c in enumerate(chunks, 1):
         subject = c.metadata.get("subject", "") if hasattr(c, "metadata") else ""
-        text_preview = (c.text or "")[:100] if hasattr(c, "text") else str(c)[:100]
+        text_preview = (c.text or "")[:80] if hasattr(c, "text") else str(c)[:80]
         title = subject or text_preview
-        lines.append(f"{i}. {title}")
+        score = c.score if hasattr(c, "score") else 0.0
+        lines.append(f"{i}. [score={score:.3f}] {title}")
     return "\n".join(lines)
 
 
