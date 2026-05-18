@@ -9,6 +9,7 @@ POST /admin/reindex       — trigger a fresh data pull from Redmine
 Run: uvicorn api.routes:app --host 0.0.0.0 --port 8080
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from redis import Redis
+from rq import Queue
 
 from config import SESSION_MAX_TURNS, ADMIN_TOKEN
 from core.models import Message
@@ -52,6 +55,10 @@ _adapters = {
     "web": WebAdapter(),
     "slack": SlackAdapter(),
 }
+
+# Redis Queue for async Telegram processing
+_redis_conn = Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+_queue = Queue("ehc-queue", connection=_redis_conn)
 
 # Slack event deduplication
 _processed_slack_events: set[str] = set()
@@ -127,7 +134,20 @@ async def handle_webhook(platform: str, request: Request, background_tasks: Back
     # Get session history
     session_history = _session_mgr.get_history(message.session_id)
 
-    # Run RAG pipeline
+    # --- Telegram: enqueue to Redis Queue and return immediately ---
+    if platform == "telegram":
+        chat_id = message.session_id.replace("tg_", "")
+        _queue.enqueue(
+            "workers.pipeline_worker.process_telegram_query",
+            chat_id=chat_id,
+            text=message.text,
+            session_id=message.session_id,
+            history=session_history,
+        )
+        print(f"[WEBHOOK] Enqueued | chat_id={chat_id} | query=\"{message.text}\"")
+        return {"ok": True}
+
+    # --- Other platforms: synchronous processing ---
     answer = run_pipeline(message, session_history)
 
     # Store turns in session
@@ -143,15 +163,10 @@ async def handle_webhook(platform: str, request: Request, background_tasks: Back
         confidence=0.0 if answer.is_fallback else answer.confidence,
     )
 
-    # Send response back via platform API (async, in background for Telegram/Zalo/Slack)
+    # Send response back via platform API (async, in background for Zalo/Slack)
     if platform != "web":
-        # For Telegram/Zalo/Slack, send via their API in background
         chat_id = message.user_id
-        if platform == "telegram":
-            # Use chat_id from session_id (tg_{chat_id})
-            chat_id = message.session_id.replace("tg_", "")
-        elif platform == "slack":
-            # Pass full session_id; adapter will extract channel and thread_ts
+        if platform == "slack":
             chat_id = message.session_id
         background_tasks.add_task(adapter.send_message, chat_id, response_text)
 
