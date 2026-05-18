@@ -16,8 +16,13 @@ import sys
 import time
 from pathlib import Path
 from typing import TypedDict, Optional
+from contextvars import ContextVar
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import core.tracer as tracer
+
+_current_run: ContextVar[dict] = ContextVar("_current_run", default=None)
 
 from langgraph.graph import StateGraph, END
 
@@ -94,6 +99,7 @@ def is_maintenance_mode() -> bool:
 
 def node_query_analyzer(state: AgentState) -> dict:
     """Classify query: EHC-related or off-topic."""
+    t0 = time.time()
     query = state["query"]
     session_id = state.get("session_id", "")
     print(f"\n[AGENT] Node: QueryAnalyzer | query=\"{query}\"")
@@ -106,49 +112,71 @@ def node_query_analyzer(state: AgentState) -> dict:
             stripped = query.strip()
             if stripped.isdigit():
                 print(f"[AGENT] Classifier: BYPASS (clarification_count={count}, numeric reply)")
-                return {
-                    "is_ehc_related": True,
-                    "intent": "search_faq",
-                }
+                result = {"is_ehc_related": True, "intent": "search_faq"}
+                run = _current_run.get()
+                if run:
+                    tracer.log_node(run, "QueryAnalyzer",
+                        {"query": query},
+                        {"is_ehc_related": True, "intent": "search_faq"},
+                        llm={"result": "BYPASS_NUMERIC"},
+                        duration_ms=int((time.time()-t0)*1000))
+                return result
             else:
                 print(f"[AGENT] Classifier: BYPASS (clarification_count={count}, free-text → block_x)")
-                return {
-                    "is_ehc_related": True,
-                    "intent": "block_x",
-                }
+                result = {"is_ehc_related": True, "intent": "block_x"}
+                run = _current_run.get()
+                if run:
+                    tracer.log_node(run, "QueryAnalyzer",
+                        {"query": query},
+                        {"is_ehc_related": True, "intent": "block_x"},
+                        llm={"result": "BYPASS_FREETEXT"},
+                        duration_ms=int((time.time()-t0)*1000))
+                return result
 
     is_off_topic = classify(query)
 
     if is_off_topic:
         print(f"[AGENT] Classifier: NO (off-topic)")
-        return {
-            "is_ehc_related": False,
-            "intent": "chat_fallback",
-        }
+        result = {"is_ehc_related": False, "intent": "chat_fallback"}
     else:
         print(f"[AGENT] Classifier: YES (EHC-related)")
-        return {
-            "is_ehc_related": True,
-            "intent": "search_faq",
-        }
+        result = {"is_ehc_related": True, "intent": "search_faq"}
+
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "QueryAnalyzer",
+            {"query": query},
+            {"is_ehc_related": result["is_ehc_related"], "intent": result["intent"]},
+            llm={"result": "NO" if is_off_topic else "YES"},
+            duration_ms=int((time.time()-t0)*1000))
+    return result
 
 
 def node_tool_router(state: AgentState) -> dict:
     """Route to the appropriate tool based on intent."""
+    t0 = time.time()
     intent = state["intent"]
     print(f"[AGENT] Node: ToolRouter | intent={intent}")
 
     if intent == "create_ticket":
-        return {"tool_called": "ticket_creator"}
+        tool = "ticket_creator"
     elif intent == "block_x":
-        return {"tool_called": "block_x"}
+        tool = "block_x"
     else:
-        # Default: search_faq for all EHC-related queries
-        return {"tool_called": "retriever"}
+        tool = "retriever"
+
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "ToolRouter",
+            {"intent": intent},
+            {"tool_called": tool},
+            duration_ms=int((time.time()-t0)*1000))
+    return {"tool_called": tool}
 
 
 def node_retriever(state: AgentState) -> dict:
     """Execute the full RAG search pipeline."""
+    t0 = time.time()
     query = state["query"]
     session_id = state.get("session_id", "")
     session_history = state.get("session_history", [])
@@ -172,6 +200,14 @@ def node_retriever(state: AgentState) -> dict:
     # Route directly to clarifier if answerable=unclear/no (steps 3+4 were skipped)
     next_intent = "clarify" if answerable in ("unclear", "no") else state.get("intent", "search_faq")
 
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "Retriever",
+            {"query": query},
+            {"rewritten_query": rewritten, "answerable": answerable, "chunks_count": len(chunks)},
+            llm={"rewritten": rewritten, "answerable": answerable},
+            duration_ms=int((time.time()-t0)*1000))
+
     return {
         "chunks": chunks,
         "rewritten_query": rewritten,
@@ -188,6 +224,7 @@ def node_synthesizer(state: AgentState) -> dict:
     Only reached when answerable=yes (unclear/no are routed to clarifier earlier).
     Uses rerank score as a secondary quality gate.
     """
+    t0 = time.time()
     chunks = state["chunks"]
     session_id = state.get("session_id", "")
 
@@ -197,19 +234,31 @@ def node_synthesizer(state: AgentState) -> dict:
 
     if is_confident:
         print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → CONFIDENT")
-        return {"confidence": top_score, "intent": "search_faq"}
-
-    # Low rerank score despite answerable=yes — ask for clarification
-    count = _session_mgr.get_clarification_count(session_id) if _session_mgr else 0
-    print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → LOW | clarification_count={count}")
-    if count >= 3:
-        return {"confidence": top_score, "intent": "create_ticket"}
+        decision = "CONFIDENT"
+        result = {"confidence": top_score, "intent": "search_faq"}
     else:
-        return {"confidence": top_score, "intent": "clarify"}
+        # Low rerank score despite answerable=yes — ask for clarification
+        count = _session_mgr.get_clarification_count(session_id) if _session_mgr else 0
+        print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → LOW | clarification_count={count}")
+        if count >= 3:
+            decision = "LOW_MAX_CLARIFY"
+            result = {"confidence": top_score, "intent": "create_ticket"}
+        else:
+            decision = "LOW"
+            result = {"confidence": top_score, "intent": "clarify"}
+
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "Synthesizer",
+            {"confidence": round(top_score, 4)},
+            {"decision": decision, "next_intent": result["intent"]},
+            duration_ms=int((time.time()-t0)*1000))
+    return result
 
 
 def node_generator(state: AgentState) -> dict:
     """Generate a grounded answer from retrieved chunks."""
+    t0 = time.time()
     rewritten = state["rewritten_query"]
     chunks = state["chunks"]
     session_history = state.get("session_history", [])
@@ -234,11 +283,20 @@ def node_generator(state: AgentState) -> dict:
         _session_mgr.reset_clarification(session_id)
 
     print(f"[AGENT] Node: Generator | answer_len={len(answer_text)}")
+
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "Generator",
+            {"chunks_count": len(chunks), "intent": state.get("intent", "")},
+            {"answer_preview": answer_text[:100]},
+            llm={"tokens": len(answer_text)},
+            duration_ms=int((time.time()-t0)*1000))
     return {"answer": answer_text}
 
 
 def node_ticket_creator(state: AgentState) -> dict:
     """Create a ticket for low-confidence queries."""
+    t0 = time.time()
     query = state["query"]
     user_intent = state.get("user_intent")
     session_id = state.get("session_id", "")
@@ -256,6 +314,13 @@ def node_ticket_creator(state: AgentState) -> dict:
     )
 
     print(f"[AGENT] Node: TicketCreator | ticket_id={ticket_id}")
+
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "TicketCreator",
+            {"query": query},
+            {"ticket_id": ticket_id},
+            duration_ms=int((time.time()-t0)*1000))
     return {
         "ticket_id": ticket_id,
         "answer": answer,
@@ -264,12 +329,20 @@ def node_ticket_creator(state: AgentState) -> dict:
 
 def node_chat_fallback(state: AgentState) -> dict:
     """Generate a short polite off-topic response."""
+    t0 = time.time()
     query = state["query"]
     print(f"[AGENT] Node: ChatFallback | query=\"{query}\"")
 
     answer = chat_fallback(query)
 
     print(f"[AGENT] Node: ChatFallback | answer=\"{answer}\"")
+
+    run = _current_run.get()
+    if run:
+        tracer.log_node(run, "ChatFallback",
+            {"query": query},
+            {"answer_preview": answer[:100]},
+            duration_ms=int((time.time()-t0)*1000))
     return {"answer": answer}
 
 
@@ -286,6 +359,7 @@ CLARIFIER_PROMPT = (
 
 def node_clarifier(state: AgentState) -> dict:
     """Ask user for more detail using LLM + fast_chunks choices."""
+    t0 = time.time()
     session_id = state.get("session_id", "")
     query = state["query"]
     fast_chunks = state.get("fast_chunks", [])
@@ -323,6 +397,14 @@ def node_clarifier(state: AgentState) -> dict:
         answer = _clarifier_fallback(query, fast_chunks, count)
 
     print(f"[AGENT] Node: Clarifier | answer=\"{answer[:80]}...\"")
+
+    run = _current_run.get()
+    if run:
+        chunk_titles = [c.metadata.get("subject", c.text[:40]) for c in fast_chunks[:5]]
+        tracer.log_node(run, "Clarifier",
+            {"chunks_titles": chunk_titles},
+            {"answer_preview": answer[:100]},
+            duration_ms=int((time.time()-t0)*1000))
     return {"answer": answer, "tool_called": "clarifier"}
 
 
@@ -354,6 +436,7 @@ def node_block_x(state: AgentState) -> dict:
     3. If answerable=yes → full retrieve + rerank → route to synthesizer
     4. If answerable=unclear/no → route to ticket_creator
     """
+    t0 = time.time()
     query = state["query"]
     session_id = state.get("session_id", "")
     session_history = state.get("session_history", [])
@@ -394,6 +477,13 @@ def node_block_x(state: AgentState) -> dict:
             print(f"[AGENT] Node: BlockX | confidence={top_score:.4f} below threshold → ticket_creator")
             if _session_mgr and session_id:
                 _session_mgr.reset_clarification(session_id)
+            run = _current_run.get()
+            if run:
+                tracer.log_node(run, "BlockX",
+                    {"query": query, "saved_chunks": len(saved_fast_chunks)},
+                    {"rewritten": rewritten, "answerable": answerable, "confidence": round(top_score, 4), "route": "ticket"},
+                    llm={"rewritten": rewritten, "answerable": answerable},
+                    duration_ms=int((time.time()-t0)*1000))
             return {
                 "chunks": [],
                 "rewritten_query": rewritten,
@@ -407,6 +497,14 @@ def node_block_x(state: AgentState) -> dict:
         # Confident enough → route to synthesizer
         if _session_mgr and session_id:
             _session_mgr.reset_clarification(session_id)
+
+        run = _current_run.get()
+        if run:
+            tracer.log_node(run, "BlockX",
+                {"query": query, "saved_chunks": len(saved_fast_chunks)},
+                {"rewritten": rewritten, "answerable": answerable, "confidence": round(top_score, 4), "route": "synthesizer"},
+                llm={"rewritten": rewritten, "answerable": answerable},
+                duration_ms=int((time.time()-t0)*1000))
 
         return {
             "chunks": ranked_chunks,
@@ -425,6 +523,14 @@ def node_block_x(state: AgentState) -> dict:
         # Reset clarification
         if _session_mgr and session_id:
             _session_mgr.reset_clarification(session_id)
+
+        run = _current_run.get()
+        if run:
+            tracer.log_node(run, "BlockX",
+                {"query": query, "saved_chunks": len(saved_fast_chunks)},
+                {"rewritten": rewritten, "answerable": answerable, "route": "ticket_no"},
+                llm={"rewritten": rewritten, "answerable": answerable},
+                duration_ms=int((time.time()-t0)*1000))
 
         return {
             "chunks": [],
@@ -516,6 +622,10 @@ def run(message: Message, session_history: list) -> Answer:
     print(f"[AGENT] Input: \"{message.text}\"")
     print(f"{'='*60}")
 
+    # Start trace
+    run_ctx = tracer.new_run(message.session_id, message.text)
+    _current_run.set(run_ctx)
+
     initial_state: AgentState = {
         "query": message.text,
         "expanded_query": message.text,
@@ -553,6 +663,10 @@ def run(message: Message, session_history: list) -> Answer:
 
     tool = result.get("tool_called", result.get("intent", "unknown"))
     print(f"\n[AGENT] Done | tool={tool} confidence={conf:.4f}")
+
+    # Finish trace
+    tracer.finish_run(run_ctx, tool, conf, answer.text)
+
     return answer
 
 

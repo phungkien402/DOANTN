@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHC Helpdesk — Run Traces</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #eee; display: flex; height: 100vh; }
+#sidebar { width: 380px; border-right: 1px solid #333; overflow-y: auto; background: #16213e; }
+#detail { flex: 1; overflow-y: auto; padding: 24px; }
+.sidebar-header { padding: 16px; border-bottom: 1px solid #333; position: sticky; top: 0; background: #16213e; z-index: 10; }
+.sidebar-header h2 { font-size: 16px; color: #4fc3f7; }
+.sidebar-header small { color: #888; font-size: 11px; }
+.run-item { padding: 12px 16px; border-bottom: 1px solid #222; cursor: pointer; transition: background 0.15s; }
+.run-item:hover { background: #1a2744; }
+.run-item.active { background: #0d3b66; border-left: 3px solid #4fc3f7; }
+.run-item .query { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+.run-item .meta { font-size: 11px; color: #888; margin-top: 4px; display: flex; gap: 10px; }
+.run-item .badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.badge-answer { background: #2e7d32; color: #c8e6c9; }
+.badge-clarify { background: #f9a825; color: #333; }
+.badge-ticket { background: #c62828; color: #ffcdd2; }
+.badge-chat { background: #1565c0; color: #bbdefb; }
+#detail-placeholder { color: #666; text-align: center; margin-top: 40vh; font-size: 14px; }
+.node-card { background: #1e2a3a; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; border-left: 4px solid #555; }
+.node-card.QueryAnalyzer { border-left-color: #78909c; }
+.node-card.ToolRouter { border-left-color: #78909c; }
+.node-card.Retriever { border-left-color: #4fc3f7; }
+.node-card.Synthesizer { border-left-color: #ab47bc; }
+.node-card.Generator { border-left-color: #66bb6a; }
+.node-card.TicketCreator { border-left-color: #ef5350; }
+.node-card.ChatFallback { border-left-color: #42a5f5; }
+.node-card.Clarifier { border-left-color: #ffa726; }
+.node-card.BlockX { border-left-color: #ffa726; }
+.node-name { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+.node-name .dur { font-weight: 400; color: #888; font-size: 11px; margin-left: 8px; }
+.node-data { font-size: 12px; color: #bbb; line-height: 1.6; }
+.node-data code { background: #263238; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+.detail-header { margin-bottom: 20px; }
+.detail-header h3 { font-size: 15px; color: #4fc3f7; margin-bottom: 4px; }
+.detail-header .info { font-size: 12px; color: #888; }
+.connector { width: 2px; height: 16px; background: #444; margin: 0 auto; }
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <div class="sidebar-header">
+    <h2>🔍 Run Traces</h2>
+    <small>Auto-refresh every 5s</small>
+  </div>
+  <div id="run-list"></div>
+</div>
+<div id="detail">
+  <div id="detail-placeholder">Select a run from the left panel</div>
+  <div id="detail-content" style="display:none;"></div>
+</div>
+
+<script>
+let runs = [];
+let selectedRunId = null;
+
+function badgeFor(tool) {
+  if (tool === 'clarifier') return '<span class="badge badge-clarify">CLARIFY</span>';
+  if (tool === 'ticket_creator') return '<span class="badge badge-ticket">TICKET</span>';
+  if (tool === 'chat_fallback' || tool === 'ChatFallback') return '<span class="badge badge-chat">CHAT</span>';
+  return '<span class="badge badge-answer">ANSWER</span>';
+}
+
+function timeAgo(ts) {
+  const diff = Math.floor(Date.now()/1000 - ts);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  return Math.floor(diff/3600) + 'h ago';
+}
+
+function renderList() {
+  const el = document.getElementById('run-list');
+  el.innerHTML = runs.map(r => `
+    <div class="run-item ${r.run_id === selectedRunId ? 'active' : ''}" onclick="selectRun('${r.run_id}')">
+      <div class="query">${escHtml(r.query)}</div>
+      <div class="meta">
+        ${badgeFor(r.tool_called)}
+        <span>${r.duration_ms}ms</span>
+        <span>conf: ${r.confidence}</span>
+        <span>${timeAgo(r.started_at)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectRun(runId) {
+  selectedRunId = runId;
+  renderList();
+  const r = runs.find(x => x.run_id === runId);
+  if (!r) return;
+  document.getElementById('detail-placeholder').style.display = 'none';
+  const dc = document.getElementById('detail-content');
+  dc.style.display = 'block';
+
+  let html = `<div class="detail-header">
+    <h3>"${escHtml(r.query)}"</h3>
+    <div class="info">Run: ${r.run_id} | Session: ${r.session_id} | Duration: ${r.duration_ms}ms | Tool: ${r.tool_called} | Confidence: ${r.confidence}</div>
+  </div>`;
+
+  if (r.nodes && r.nodes.length) {
+    r.nodes.forEach((n, i) => {
+      if (i > 0) html += '<div class="connector"></div>';
+      html += `<div class="node-card ${n.name}">
+        <div class="node-name">${n.name}<span class="dur">${n.duration_ms}ms</span></div>
+        <div class="node-data">`;
+      if (n.input && Object.keys(n.input).length) {
+        html += '<div><strong>In:</strong> ' + Object.entries(n.input).map(([k,v]) => `${k}=<code>${escHtml(String(v).substring(0,80))}</code>`).join(', ') + '</div>';
+      }
+      if (n.output && Object.keys(n.output).length) {
+        html += '<div><strong>Out:</strong> ' + Object.entries(n.output).map(([k,v]) => `${k}=<code>${escHtml(String(v).substring(0,80))}</code>`).join(', ') + '</div>';
+      }
+      if (n.llm) {
+        html += '<div><strong>LLM:</strong> ' + Object.entries(n.llm).map(([k,v]) => `${k}=<code>${escHtml(String(v).substring(0,60))}</code>`).join(', ') + '</div>';
+      }
+      html += '</div></div>';
+    });
+  } else {
+    html += '<p style="color:#888;">No node data recorded.</p>';
+  }
+
+  if (r.answer) {
+    html += `<div class="connector"></div><div class="node-card Generator" style="border-left-color:#66bb6a;">
+      <div class="node-name">Final Answer</div>
+      <div class="node-data"><code>${escHtml(r.answer)}</code></div>
+    </div>`;
+  }
+
+  dc.innerHTML = html;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function fetchTraces() {
+  try {
+    const resp = await fetch('/traces');
+    runs = await resp.json();
+    renderList();
+    if (selectedRunId) selectRun(selectedRunId);
+  } catch(e) { console.error('Fetch error:', e); }
+}
+
+fetchTraces();
+setInterval(fetchTraces, 5000);
+</script>
+</body>
+</html>
