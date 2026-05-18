@@ -62,9 +62,23 @@ HƯỚNG DẪN QUYẾT ĐỊNH:
    hoặc đã clarify rồi nhưng vẫn không tìm được chunk phù hợp.
 
 ---
+CHỌN TOOL TÌM KIẾM (field "tool"):
+- "search_manual" — khi:
+  * Chunk #1 hoặc #2 có source chứa "hdsd" VÀ score > 0.5 → LUÔN chọn search_manual.
+  * User hỏi CÁCH SỬ DỤNG một chức năng: cài đặt, cấu hình, hướng dẫn từng bước, quy trình.
+  Ví dụ: "cách cài đặt...", "hướng dẫn kết nối...", "làm thế nào để...", "thao tác...", "các bước để...", "quy trình..."
+- "search_faq" — khi:
+  * Các chunk đầu có source="faq" chiếm ưu thế, HOẶC
+  * User báo lỗi, hỏi tại sao, hoặc gặp vấn đề không hoạt động.
+  Ví dụ: "không in được", "bị lỗi", "tại sao không...", "không đăng nhập được", "bấm không được"
+- QUAN TRỌNG: Nếu chunk #1 hoặc #2 có source chứa "hdsd" và score > 0.5, luôn chọn "search_manual".
+- Mặc định: "search_faq" khi không chắc chắn.
+
+---
 TRẢ LỜI THEO ĐỊNH DẠNG JSON (không giải thích thêm):
 {{
   "action": "answer" | "clarify" | "ticket",
+  "tool": "search_faq" | "search_manual",
   "reasoning": "lý do ngắn gọn",
   "search_query": "...",
   "clarify_message": "..."
@@ -72,16 +86,15 @@ TRẢ LỜI THEO ĐỊNH DẠNG JSON (không giải thích thêm):
 
 
 def _format_chunks(chunks) -> str:
-    """Format fast_chunks for the orchestrator prompt, including scores."""
+    """Format fast_chunks for the orchestrator prompt, including scores and source."""
     if not chunks:
         return "(không có)"
     lines = []
     for i, c in enumerate(chunks, 1):
-        subject = c.metadata.get("subject", "") if hasattr(c, "metadata") else ""
-        text_preview = (c.text or "")[:80] if hasattr(c, "text") else str(c)[:80]
-        title = subject or text_preview
-        score = c.score if hasattr(c, "score") else 0.0
-        lines.append(f"{i}. [score={score:.3f}] {title}")
+        title = getattr(c, "title", "") or (c.metadata.get("subject", "") if hasattr(c, "metadata") else "") or (c.text or "")[:80] if hasattr(c, "text") else str(c)[:80]
+        score = getattr(c, "score", 0.0)
+        source = c.metadata.get("source", "faq") if hasattr(c, "metadata") else "faq"
+        lines.append(f"{i}. [score={score:.3f}][source={source}] {title}")
     return "\n".join(lines)
 
 
@@ -161,7 +174,8 @@ def _parse_response(raw: str, query: str) -> dict:
         result.setdefault("search_query", query)
         result.setdefault("clarify_message", "")
         result.setdefault("reasoning", "")
-        print(f"[ORCHESTRATOR] Action={action} | reasoning=\"{result['reasoning'][:80]}\"")
+        result.setdefault("tool", "search_faq")
+        print(f"[ORCHESTRATOR] Action={action} | tool={result['tool']} | reasoning=\"{result['reasoning'][:80]}\"")
         return result
     except Exception as e:
         print(f"[ORCHESTRATOR] Parse error: {e} → fallback to answer")
@@ -175,6 +189,7 @@ def _fallback_result(query: str) -> dict:
         "reasoning": "orchestrator fallback",
         "search_query": query,
         "clarify_message": "",
+        "tool": "search_faq",
     }
 
 

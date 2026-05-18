@@ -60,6 +60,7 @@ class AgentState(TypedDict):
     user_intent: Optional[str]    # intent description from orchestrator reasoning
     session_history: list         # conversation history
     session_id: str               # needed for session tracking
+    tool: str                     # "search_faq" | "search_manual"
 
 
 # --- Maintenance mode ---
@@ -129,7 +130,7 @@ def node_tool_router(state: AgentState) -> dict:
 
 
 def node_fast_retriever(state: AgentState) -> dict:
-    """Fast retrieve top 3 chunks (no rerank) for orchestrator context."""
+    """Fast retrieve top chunks from BOTH collections for orchestrator context."""
     query = state["query"]
     session_id = state.get("session_id", "")
     print(f"[AGENT] Node: FastRetriever | query=\"{query}\"")
@@ -143,10 +144,21 @@ def node_fast_retriever(state: AgentState) -> dict:
 
     # Expand abbreviations before retrieval
     expanded = expand_abbreviations(query)
-    fast_chunks = retriever.retrieve(expanded, top_k=3)
 
-    print(f"[AGENT] Node: FastRetriever | {len(fast_chunks)} chunks retrieved")
-    return {"fast_chunks": fast_chunks}
+    # Query both collections
+    from core.tools.search_manual import _retrieve_manual
+    faq_chunks = retriever.retrieve(expanded, top_k=2)
+    manual_chunks = _retrieve_manual(expanded, top_k=2)
+
+    # Merge and sort by score, take top 4
+    all_chunks = sorted(faq_chunks + manual_chunks, key=lambda c: c.score, reverse=True)[:4]
+
+    for i, c in enumerate(all_chunks, 1):
+        src = c.metadata.get("source", "faq")
+        print(f"[RETRIEVER] #{i} score={c.score:.3f} [{src}] | {c.metadata.get('subject','')[:60]}")
+
+    print(f"[AGENT] Node: FastRetriever | {len(all_chunks)} chunks (faq+manual)")
+    return {"fast_chunks": all_chunks}
 
 
 def node_orchestrator(state: AgentState) -> dict:
@@ -202,24 +214,28 @@ def node_orchestrator(state: AgentState) -> dict:
             "intent": "search_faq",
             "rewritten_query": search_query,
             "tool_called": "full_retriever",
+            "tool": result.get("tool", "search_faq"),
         }
 
 
 def node_full_retriever(state: AgentState) -> dict:
     """Full retrieve (top K) + rerank (top N) using the orchestrator's search_query."""
     rewritten = state.get("rewritten_query", state["query"])
-    print(f"[AGENT] Node: FullRetriever | query=\"{rewritten}\"")
+    tool = state.get("tool", "search_faq")
+    print(f"[AGENT] Node: FullRetriever | tool={tool} | query=\"{rewritten}\"")
 
-    chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
+    if tool == "search_manual":
+        from core.tools.search_manual import search_manual
+        ranked_chunks, top_score = search_manual(rewritten)
+    else:
+        chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
+        if not chunks:
+            print(f"[AGENT] Node: FullRetriever | no chunks retrieved")
+            return {"chunks": [], "confidence": 0.0}
+        ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
+        top_score = ranked_chunks[0].score if ranked_chunks else 0.0
 
-    if not chunks:
-        print(f"[AGENT] Node: FullRetriever | no chunks retrieved")
-        return {"chunks": [], "confidence": 0.0}
-
-    ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
-    top_score = ranked_chunks[0].score if ranked_chunks else 0.0
-
-    print(f"[AGENT] Node: FullRetriever | {len(ranked_chunks)} chunks, top_score={top_score:.4f}")
+    print(f"[AGENT] Node: FullRetriever | tool={tool} | top_score={top_score:.4f}")
     return {"chunks": ranked_chunks, "confidence": top_score}
 
 
@@ -392,6 +408,7 @@ def run(message: Message, session_history: list) -> Answer:
         "user_intent": None,
         "session_history": session_history,
         "session_id": message.session_id,
+        "tool": "search_faq",
     }
 
     result = app.invoke(initial_state)
