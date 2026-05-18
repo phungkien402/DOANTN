@@ -60,6 +60,7 @@ class AgentState(TypedDict):
     user_intent: Optional[str]    # intent description from orchestrator reasoning
     session_history: list         # conversation history
     session_id: str               # needed for session tracking
+    collection: str               # "faq" | "manual"
 
 
 # --- Maintenance mode ---
@@ -202,24 +203,28 @@ def node_orchestrator(state: AgentState) -> dict:
             "intent": "search_faq",
             "rewritten_query": search_query,
             "tool_called": "full_retriever",
+            "collection": result.get("collection", "faq"),
         }
 
 
 def node_full_retriever(state: AgentState) -> dict:
     """Full retrieve (top K) + rerank (top N) using the orchestrator's search_query."""
     rewritten = state.get("rewritten_query", state["query"])
-    print(f"[AGENT] Node: FullRetriever | query=\"{rewritten}\"")
+    collection = state.get("collection", "faq")
+    print(f"[AGENT] Node: FullRetriever | collection={collection} | query=\"{rewritten}\"")
 
-    chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
+    if collection == "manual":
+        from core.tools.search_manual import search_manual
+        ranked_chunks, top_score = search_manual(rewritten)
+    else:
+        chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
+        if not chunks:
+            print(f"[AGENT] Node: FullRetriever | no chunks retrieved")
+            return {"chunks": [], "confidence": 0.0}
+        ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
+        top_score = ranked_chunks[0].score if ranked_chunks else 0.0
 
-    if not chunks:
-        print(f"[AGENT] Node: FullRetriever | no chunks retrieved")
-        return {"chunks": [], "confidence": 0.0}
-
-    ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
-    top_score = ranked_chunks[0].score if ranked_chunks else 0.0
-
-    print(f"[AGENT] Node: FullRetriever | {len(ranked_chunks)} chunks, top_score={top_score:.4f}")
+    print(f"[AGENT] Node: FullRetriever | collection={collection} | top_score={top_score:.4f}")
     return {"chunks": ranked_chunks, "confidence": top_score}
 
 
@@ -392,6 +397,7 @@ def run(message: Message, session_history: list) -> Answer:
         "user_intent": None,
         "session_history": session_history,
         "session_id": message.session_id,
+        "collection": "faq",
     }
 
     result = app.invoke(initial_state)

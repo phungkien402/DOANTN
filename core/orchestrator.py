@@ -62,9 +62,18 @@ HƯỚNG DẪN QUYẾT ĐỊNH:
    hoặc đã clarify rồi nhưng vẫn không tìm được chunk phù hợp.
 
 ---
+CHỌN COLLECTION TÌM KIẾM (field "collection"):
+- "manual" — khi user hỏi CÁCH SỬ DỤNG một chức năng: cài đặt, cấu hình, hướng dẫn từng bước.
+  Ví dụ: "cách cài đặt...", "hướng dẫn kết nối...", "làm thế nào để...", "thao tác..."
+- "faq" — khi user báo lỗi, hỏi tại sao: bugs, failures, không hoạt động.
+  Ví dụ: "không in được", "bị lỗi", "tại sao không...", "không đăng nhập được"
+- Mặc định: "faq" khi không chắc chắn.
+
+---
 TRẢ LỜI THEO ĐỊNH DẠNG JSON (không giải thích thêm):
 {{
   "action": "answer" | "clarify" | "ticket",
+  "collection": "faq" | "manual",
   "reasoning": "lý do ngắn gọn",
   "search_query": "...",
   "clarify_message": "..."
@@ -161,6 +170,7 @@ def _parse_response(raw: str, query: str) -> dict:
         result.setdefault("search_query", query)
         result.setdefault("clarify_message", "")
         result.setdefault("reasoning", "")
+        result.setdefault("collection", "faq")
         print(f"[ORCHESTRATOR] Action={action} | reasoning=\"{result['reasoning'][:80]}\"")
         return result
     except Exception as e:
@@ -175,6 +185,7 @@ def _fallback_result(query: str) -> dict:
         "reasoning": "orchestrator fallback",
         "search_query": query,
         "clarify_message": "",
+        "collection": "faq",
     }
 
 
