@@ -84,7 +84,7 @@ def run_eval():
     print(f"{'='*60}\n")
 
     dataset_name = f"ehc-eval-{int(time.time())}"
-    dataset = lf.create_dataset(name=dataset_name)
+    lf.create_dataset(name=dataset_name)
 
     results = []
     correct_tool = 0
@@ -136,21 +136,11 @@ def run_eval():
         status = "✓" if tool_ok else "✗"
         print(f"  {status} tool={actual_tool} conf={answer.confidence:.3f} latency={latency:.1f}s")
 
-        item = dataset.create_item(
+        lf.create_dataset_item(
+            dataset_name=dataset_name,
             input={"query": query, "category": category, "expected_tool": expected_tool},
             expected_output={"answered": should_answer, "tool": expected_tool},
-        )
-        lf.score(
-            trace_id=item.id,
-            name="tool_correct",
-            value=1.0 if tool_ok else 0.0,
-            data_type="BOOLEAN",
-        )
-        lf.score(
-            trace_id=item.id,
-            name="confidence",
-            value=round(answer.confidence, 4),
-            data_type="NUMERIC",
+            metadata={"tool_correct": tool_ok, "confidence": round(answer.confidence, 4)},
         )
 
         results.append({
