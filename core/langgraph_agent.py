@@ -89,7 +89,16 @@ def is_maintenance_mode() -> bool:
 def node_query_analyzer(state: AgentState) -> dict:
     """Classify query: EHC-related or off-topic."""
     query = state["query"]
+    session_id = state.get("session_id", "")
     print(f"\n[AGENT] Node: QueryAnalyzer | query=\"{query}\"")
+
+    # Bypass classifier if mid-clarification — let Orchestrator handle via history
+    if _session_mgr and _session_mgr.is_awaiting_clarification(session_id):
+        print(f"[AGENT] Classifier: BYPASS (awaiting_clarification=True)")
+        return {
+            "is_ehc_related": True,
+            "intent": "search_faq",
+        }
 
     is_off_topic = classify(query)
 
@@ -122,7 +131,15 @@ def node_tool_router(state: AgentState) -> dict:
 def node_fast_retriever(state: AgentState) -> dict:
     """Fast retrieve top 3 chunks (no rerank) for orchestrator context."""
     query = state["query"]
+    session_id = state.get("session_id", "")
     print(f"[AGENT] Node: FastRetriever | query=\"{query}\"")
+
+    # Reuse saved fast_chunks from clarification turn if available
+    if _session_mgr:
+        saved = _session_mgr.get_fast_chunks(session_id)
+        if saved:
+            print(f"[AGENT] Node: FastRetriever | reusing {len(saved)} saved chunks")
+            return {"fast_chunks": saved}
 
     # Expand abbreviations before retrieval
     expanded = expand_abbreviations(query)
@@ -137,6 +154,7 @@ def node_orchestrator(state: AgentState) -> dict:
     query = state["query"]
     fast_chunks = state.get("fast_chunks", [])
     session_history = state.get("session_history", [])
+    session_id = state.get("session_id", "")
     print(f"[AGENT] Node: Orchestrator | query=\"{query}\"")
 
     from core.orchestrator import orchestrate
@@ -155,6 +173,10 @@ def node_orchestrator(state: AgentState) -> dict:
     print(f"[AGENT] Node: Orchestrator | action={action} | search_query=\"{search_query}\"")
 
     if action == "clarify":
+        # Set flag so next turn bypasses classifier
+        if _session_mgr:
+            _session_mgr.set_awaiting_clarification(session_id, True)
+            _session_mgr.set_fast_chunks(session_id, fast_chunks)
         return {
             "answer": clarify_msg,
             "intent": "clarify",
@@ -162,12 +184,20 @@ def node_orchestrator(state: AgentState) -> dict:
             "rewritten_query": search_query,
         }
     elif action == "ticket":
+        # Clear clarification state
+        if _session_mgr:
+            _session_mgr.set_awaiting_clarification(session_id, False)
+            _session_mgr.set_fast_chunks(session_id, [])
         return {
             "intent": "create_ticket",
             "tool_called": "ticket_creator",
             "rewritten_query": search_query,
         }
     else:  # answer
+        # Clear clarification state
+        if _session_mgr:
+            _session_mgr.set_awaiting_clarification(session_id, False)
+            _session_mgr.set_fast_chunks(session_id, [])
         return {
             "intent": "search_faq",
             "rewritten_query": search_query,

@@ -20,6 +20,8 @@ class SessionManager:
     def __init__(self, max_turns: int = 10, ttl_seconds: int = 1800):
         self._sessions: dict[str, list[dict]] = {}
         self._last_active: dict[str, float] = {}
+        self._awaiting_clarification: dict[str, bool] = {}
+        self._fast_chunks: dict[str, list] = {}
         self._max_turns = max_turns
         self._ttl = ttl_seconds
 
@@ -44,10 +46,30 @@ class SessionManager:
         self._sessions[session_id] = self._sessions[session_id][-self._max_turns:]
         self._last_active[session_id] = time.time()
 
+    def is_awaiting_clarification(self, session_id: str) -> bool:
+        """Check if session is mid-clarification (bot asked, waiting for user reply)."""
+        self._check_ttl(session_id)
+        return self._awaiting_clarification.get(session_id, False)
+
+    def set_awaiting_clarification(self, session_id: str, value: bool) -> None:
+        """Set or clear the awaiting_clarification flag."""
+        self._awaiting_clarification[session_id] = value
+
+    def get_fast_chunks(self, session_id: str) -> list:
+        """Get saved fast_chunks from the clarification turn."""
+        self._check_ttl(session_id)
+        return self._fast_chunks.get(session_id, [])
+
+    def set_fast_chunks(self, session_id: str, chunks: list) -> None:
+        """Save fast_chunks for reuse in the next turn."""
+        self._fast_chunks[session_id] = chunks
+
     def clear(self, session_id: str) -> None:
         """Clear a session's history."""
         self._sessions.pop(session_id, None)
         self._last_active.pop(session_id, None)
+        self._awaiting_clarification.pop(session_id, None)
+        self._fast_chunks.pop(session_id, None)
 
 
 if __name__ == "__main__":
