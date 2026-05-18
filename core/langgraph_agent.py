@@ -18,7 +18,7 @@ Run standalone: python3 core/langgraph_agent.py
 import sys
 import time
 from pathlib import Path
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -30,6 +30,7 @@ from core.intent_guard import classify, chat_fallback
 from core.tools.create_ticket import save_ticket
 from core import generator, confidence, retriever, reranker
 from core.abbreviations import expand_abbreviations
+from core.langfuse_tracer import new_trace, log_span, end_trace
 
 
 # --- Session manager injection (set from api/routes.py to avoid circular imports) ---
@@ -61,6 +62,7 @@ class AgentState(TypedDict):
     session_history: list         # conversation history
     session_id: str               # needed for session tracking
     tool: str                     # "search_faq" | "search_manual"
+    lf_trace: Any                 # Langfuse trace object (or None)
 
 
 # --- Maintenance mode ---
@@ -167,10 +169,12 @@ def node_orchestrator(state: AgentState) -> dict:
     fast_chunks = state.get("fast_chunks", [])
     session_history = state.get("session_history", [])
     session_id = state.get("session_id", "")
+    lf_trace = state.get("lf_trace")
     print(f"[AGENT] Node: Orchestrator | query=\"{query}\"")
 
     from core.orchestrator import orchestrate
 
+    t_orch_start = time.time()
     result = orchestrate(
         query=query,
         fast_chunks=fast_chunks,
@@ -181,6 +185,14 @@ def node_orchestrator(state: AgentState) -> dict:
     search_query = result.get("search_query", query)
     clarify_msg = result.get("clarify_message", "")
     reasoning = result.get("reasoning", "")
+
+    log_span(
+        lf_trace,
+        "Orchestrator",
+        input_data={"query": query, "fast_chunks": len(fast_chunks)},
+        output_data={"action": action, "tool": result.get("tool", ""), "reasoning": reasoning[:100]},
+        start_time=t_orch_start,
+    )
 
     print(f"[AGENT] Node: Orchestrator | action={action} | search_query=\"{search_query}\"")
 
@@ -222,8 +234,10 @@ def node_full_retriever(state: AgentState) -> dict:
     """Full retrieve (top K) + rerank (top N) using the orchestrator's search_query."""
     rewritten = state.get("rewritten_query", state["query"])
     tool = state.get("tool", "search_faq")
+    lf_trace = state.get("lf_trace")
     print(f"[AGENT] Node: FullRetriever | tool={tool} | query=\"{rewritten}\"")
 
+    t_ret_start = time.time()
     if tool == "search_manual":
         from core.tools.search_manual import search_manual
         ranked_chunks, top_score = search_manual(rewritten)
@@ -234,6 +248,14 @@ def node_full_retriever(state: AgentState) -> dict:
             return {"chunks": [], "confidence": 0.0}
         ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
         top_score = ranked_chunks[0].score if ranked_chunks else 0.0
+
+    log_span(
+        lf_trace,
+        "FullRetriever",
+        input_data={"query": rewritten, "tool": tool},
+        output_data={"chunks": len(ranked_chunks), "top_score": round(top_score, 4)},
+        start_time=t_ret_start,
+    )
 
     print(f"[AGENT] Node: FullRetriever | tool={tool} | top_score={top_score:.4f}")
     return {"chunks": ranked_chunks, "confidence": top_score}
@@ -259,9 +281,11 @@ def node_generator(state: AgentState) -> dict:
     rewritten = state["rewritten_query"]
     chunks = state["chunks"]
     session_history = state.get("session_history", [])
+    lf_trace = state.get("lf_trace")
 
     print(f"[AGENT] Node: Generator | chunks={len(chunks)}")
 
+    t_gen_start = time.time()
     try:
         answer_text = generator.generate(
             rewritten, chunks, session_history
@@ -272,6 +296,14 @@ def node_generator(state: AgentState) -> dict:
             "⚠️ Hệ thống AI đang bận hoặc đang khởi động lại, "
             "vui lòng thử lại sau 1–2 phút. Nếu vẫn lỗi, liên hệ bộ phận IT để kiểm tra server."
         )
+
+    log_span(
+        lf_trace,
+        "Generator",
+        input_data={"chunks": len(chunks), "query": rewritten},
+        output_data={"answer_len": len(answer_text)},
+        start_time=t_gen_start,
+    )
 
     print(f"[AGENT] Node: Generator | answer_len={len(answer_text)}")
     return {"answer": answer_text}
@@ -394,6 +426,8 @@ def run(message: Message, session_history: list) -> Answer:
     print(f"[AGENT] Input: \"{message.text}\"")
     print(f"{'='*60}")
 
+    lf_trace = new_trace(query=message.text, session_id=message.session_id)
+
     initial_state: AgentState = {
         "query": message.text,
         "is_ehc_related": False,
@@ -409,6 +443,7 @@ def run(message: Message, session_history: list) -> Answer:
         "session_history": session_history,
         "session_id": message.session_id,
         "tool": "search_faq",
+        "lf_trace": lf_trace,
     }
 
     result = app.invoke(initial_state)
@@ -427,8 +462,11 @@ def run(message: Message, session_history: list) -> Answer:
         rewritten_question=rewritten,
     )
 
-    tool = result.get("tool_called", result.get("intent", "unknown"))
-    print(f"\n[AGENT] Done | tool={tool} confidence={conf:.4f}")
+    tool_used = result.get("tool_called", result.get("intent", "unknown"))
+    answered = conf >= CONFIDENCE_THRESHOLD and not is_fallback
+    end_trace(lf_trace, tool=tool_used, confidence=conf, answered=answered)
+
+    print(f"\n[AGENT] Done | tool={tool_used} confidence={conf:.4f}")
     return answer
 
 
