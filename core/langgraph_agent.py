@@ -25,7 +25,7 @@ from openai import OpenAI
 from config import CONFIDENCE_THRESHOLD, MAINTENANCE_MODE, VLLM_BASE_URL, VLLM_MODEL, RETRIEVER_TOP_K, RERANKER_TOP_N
 from core.models import Message, Answer, RetrievedChunk
 from core.intent_guard import classify, chat_fallback
-from core.tools.search_faq import search_faq
+from core.tools.search_faq import search_faq, full_retrieve_and_rerank
 from core.tools.create_ticket import save_ticket
 from core import generator, confidence, retriever, reranker
 from core.query_rewriter import analyze_and_rewrite
@@ -384,16 +384,27 @@ def node_block_x(state: AgentState) -> dict:
 
     print(f"[AGENT] Node: BlockX | rewritten=\"{rewritten}\" answerable={answerable}")
 
-    # If answerable → full retrieve + rerank → route to synthesizer
-    if answerable == "yes":
-        print(f"[AGENT] Node: BlockX | answerable=yes → full retrieve + rerank")
-        chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
-        if chunks:
-            ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
-        else:
-            ranked_chunks = []
+    # If answerable=yes or unclear → attempt full retrieve + rerank
+    if answerable == "yes" or answerable == "unclear":
+        print(f"[AGENT] Node: BlockX | answerable={answerable} → full retrieve + rerank")
+        ranked_chunks, top_score = full_retrieve_and_rerank(rewritten)
 
-        # Reset clarification after resolving
+        # If unclear and confidence below threshold → fall back to ticket
+        if answerable == "unclear" and top_score < CONFIDENCE_THRESHOLD:
+            print(f"[AGENT] Node: BlockX | confidence={top_score:.4f} below threshold → ticket_creator")
+            if _session_mgr and session_id:
+                _session_mgr.reset_clarification(session_id)
+            return {
+                "chunks": [],
+                "rewritten_query": rewritten,
+                "user_intent": user_intent,
+                "answerable": answerable,
+                "confidence": top_score,
+                "fast_chunks": saved_fast_chunks,
+                "intent": "create_ticket",
+            }
+
+        # Confident enough → route to synthesizer
         if _session_mgr and session_id:
             _session_mgr.reset_clarification(session_id)
 
@@ -402,12 +413,14 @@ def node_block_x(state: AgentState) -> dict:
             "rewritten_query": rewritten,
             "user_intent": user_intent,
             "answerable": answerable,
+            "confidence": top_score,
             "fast_chunks": saved_fast_chunks,
             "intent": "search_faq",  # route to synthesizer
         }
+
     else:
-        # answerable=unclear/no → route to ticket_creator
-        print(f"[AGENT] Node: BlockX | answerable={answerable} → ticket_creator")
+        # answerable=no → route to ticket_creator immediately
+        print(f"[AGENT] Node: BlockX | answerable=no → ticket_creator immediately")
 
         # Reset clarification
         if _session_mgr and session_id:

@@ -16,6 +16,29 @@ from core.query_rewriter import analyze_and_rewrite
 from core.generator import LLMUnavailableError
 
 
+def full_retrieve_and_rerank(query: str) -> tuple[list[RetrievedChunk], float]:
+    """
+    Execute Step 3 + Step 4 of the RAG pipeline as a standalone helper.
+    Full retrieve (top K) → Rerank (top N) → return (ranked_chunks, top_score).
+
+    Used by node_block_x when answerable=unclear to attempt retrieval before falling back to ticket.
+    """
+    print(f"[SEARCH_FAQ] full_retrieve_and_rerank: query=\"{query}\"")
+
+    # Full retrieve
+    chunks = retriever.retrieve(query, top_k=RETRIEVER_TOP_K)
+    if not chunks:
+        print("[SEARCH_FAQ] full_retrieve_and_rerank: no chunks retrieved")
+        return [], 0.0
+
+    # Rerank
+    ranked_chunks = reranker.rerank(query, chunks, top_n=RERANKER_TOP_N)
+    top_score = ranked_chunks[0].score if ranked_chunks else 0.0
+
+    print(f"[SEARCH_FAQ] full_retrieve_and_rerank: {len(ranked_chunks)} chunks, top_score={top_score:.4f}")
+    return ranked_chunks, top_score
+
+
 def search_faq(query: str, session_history: list = None, saved_fast_chunks: list = None) -> tuple[list[RetrievedChunk], str, str | None, str, list[RetrievedChunk]]:
     """
     Execute the full RAG search pipeline:
