@@ -22,12 +22,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from langgraph.graph import StateGraph, END
 
 from openai import OpenAI
-from config import CONFIDENCE_THRESHOLD, MAINTENANCE_MODE, VLLM_BASE_URL, VLLM_MODEL
+from config import CONFIDENCE_THRESHOLD, MAINTENANCE_MODE, VLLM_BASE_URL, VLLM_MODEL, RETRIEVER_TOP_K, RERANKER_TOP_N
 from core.models import Message, Answer, RetrievedChunk
 from core.intent_guard import classify, chat_fallback
 from core.tools.search_faq import search_faq
 from core.tools.create_ticket import save_ticket
-from core import generator, confidence
+from core import generator, confidence, retriever, reranker
+from core.query_rewriter import analyze_and_rewrite
+from core.generator import LLMUnavailableError
 
 # Module-level vLLM client for clarifier
 _client = OpenAI(base_url=f"{VLLM_BASE_URL}/v1", api_key="not-needed")
@@ -100,11 +102,20 @@ def node_query_analyzer(state: AgentState) -> dict:
     if _session_mgr:
         count = _session_mgr.get_clarification_count(session_id)
         if count > 0:
-            print(f"[AGENT] Classifier: BYPASS (clarification_count={count})")
-            return {
-                "is_ehc_related": True,
-                "intent": "search_faq",
-            }
+            # Detect if user replied with a number (e.g. "1", "2") or free-text
+            stripped = query.strip()
+            if stripped.isdigit():
+                print(f"[AGENT] Classifier: BYPASS (clarification_count={count}, numeric reply)")
+                return {
+                    "is_ehc_related": True,
+                    "intent": "search_faq",
+                }
+            else:
+                print(f"[AGENT] Classifier: BYPASS (clarification_count={count}, free-text → block_x)")
+                return {
+                    "is_ehc_related": True,
+                    "intent": "block_x",
+                }
 
     is_off_topic = classify(query)
 
@@ -129,6 +140,8 @@ def node_tool_router(state: AgentState) -> dict:
 
     if intent == "create_ticket":
         return {"tool_called": "ticket_creator"}
+    elif intent == "block_x":
+        return {"tool_called": "block_x"}
     else:
         # Default: search_faq for all EHC-related queries
         return {"tool_called": "retriever"}
@@ -266,7 +279,8 @@ CLARIFIER_PROMPT = (
     "Dựa vào câu hỏi và danh sách vấn đề liên quan bên dưới, "
     "hãy hỏi lại người dùng bằng cách đưa ra các lựa chọn cụ thể (dạng danh sách đánh số). "
     "Giọng thân thiện, ngắn gọn. Không giải thích thêm. "
-    "Kết thúc bằng: 'Bạn đang gặp vấn đề nào trong các trường hợp trên?'"
+    "Kết thúc bằng: 'Bạn đang gặp vấn đề nào trong các trường hợp trên? "
+    "Nếu không có trường hợp nào phù hợp, bạn có thể mô tả chi tiết vấn đề bằng lời của mình.'"
 )
 
 
@@ -331,6 +345,84 @@ def _clarifier_fallback(query: str, fast_chunks: list, count: int) -> str:
     )
 
 
+def node_block_x(state: AgentState) -> dict:
+    """Block X: Synthesis node for free-text clarification responses.
+
+    When user replies with free-text (not a number) during clarification loop:
+    1. Retrieve saved_fast_chunks from session
+    2. Call analyze_and_rewrite with chunks + history to resolve intent
+    3. If answerable=yes → full retrieve + rerank → route to synthesizer
+    4. If answerable=unclear/no → route to ticket_creator
+    """
+    query = state["query"]
+    session_id = state.get("session_id", "")
+    session_history = state.get("session_history", [])
+    print(f"[AGENT] Node: BlockX | query=\"{query}\"")
+
+    # Get saved fast_chunks from clarification session
+    saved_fast_chunks = []
+    if _session_mgr:
+        saved_fast_chunks = _session_mgr.get_fast_chunks(session_id) or []
+    print(f"[AGENT] Node: BlockX | saved_fast_chunks={len(saved_fast_chunks)}")
+
+    # Analyze + rewrite using saved chunks as context
+    user_intent = None
+    rewritten = query
+    answerable = "unclear"
+    try:
+        if saved_fast_chunks:
+            user_intent, rewritten, answerable = analyze_and_rewrite(
+                query, chunks=saved_fast_chunks, session_history=session_history
+            )
+        else:
+            user_intent, rewritten, answerable = analyze_and_rewrite(
+                query, session_history=session_history
+            )
+    except LLMUnavailableError:
+        print("[AGENT] Node: BlockX | vLLM unavailable, defaulting to ticket")
+        answerable = "no"
+
+    print(f"[AGENT] Node: BlockX | rewritten=\"{rewritten}\" answerable={answerable}")
+
+    # If answerable → full retrieve + rerank → route to synthesizer
+    if answerable == "yes":
+        print(f"[AGENT] Node: BlockX | answerable=yes → full retrieve + rerank")
+        chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
+        if chunks:
+            ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
+        else:
+            ranked_chunks = []
+
+        # Reset clarification after resolving
+        if _session_mgr and session_id:
+            _session_mgr.reset_clarification(session_id)
+
+        return {
+            "chunks": ranked_chunks,
+            "rewritten_query": rewritten,
+            "user_intent": user_intent,
+            "answerable": answerable,
+            "fast_chunks": saved_fast_chunks,
+            "intent": "search_faq",  # route to synthesizer
+        }
+    else:
+        # answerable=unclear/no → route to ticket_creator
+        print(f"[AGENT] Node: BlockX | answerable={answerable} → ticket_creator")
+
+        # Reset clarification
+        if _session_mgr and session_id:
+            _session_mgr.reset_clarification(session_id)
+
+        return {
+            "chunks": [],
+            "rewritten_query": rewritten,
+            "user_intent": user_intent,
+            "answerable": answerable,
+            "fast_chunks": saved_fast_chunks,
+            "intent": "create_ticket",
+        }
+
+
 # --- Graph wiring ---
 
 graph = StateGraph(AgentState)
@@ -344,6 +436,7 @@ graph.add_node("generator", node_generator)
 graph.add_node("ticket_creator", node_ticket_creator)
 graph.add_node("chat_fallback", node_chat_fallback)
 graph.add_node("clarifier", node_clarifier)
+graph.add_node("block_x", node_block_x)
 
 # Set entry point
 graph.set_entry_point("query_analyzer")
@@ -355,7 +448,7 @@ graph.add_conditional_edges(
 )
 graph.add_conditional_edges(
     "tool_router",
-    lambda s: s["tool_called"]  # "retriever" or "ticket_creator"
+    lambda s: s["tool_called"]  # "retriever" or "ticket_creator" or "block_x"
 )
 graph.add_conditional_edges(
     "synthesizer",
@@ -370,6 +463,12 @@ graph.add_conditional_edges(
 graph.add_conditional_edges(
     "retriever",
     lambda s: "clarifier" if s.get("intent") == "clarify" else "synthesizer"
+)
+
+# BlockX → conditional: synthesizer (if answerable=yes) or ticket_creator
+graph.add_conditional_edges(
+    "block_x",
+    lambda s: "synthesizer" if s.get("intent") == "search_faq" else "ticket_creator"
 )
 
 # Linear edges

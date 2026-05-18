@@ -52,6 +52,9 @@ RETRIEVER_TOP_K = int(_get("RETRIEVER_TOP_K", "10"))
 RERANKER_TOP_N = int(_get("RERANKER_TOP_N", "3"))
 CONFIDENCE_THRESHOLD = float(_get("CONFIDENCE_THRESHOLD", "0.4"))
 
+# --- Clarification heuristic ---
+CLARIFY_SPREAD_THRESHOLD = float(_get("CLARIFY_SPREAD_THRESHOLD", "0.05"))
+
 # --- Session ---
 SESSION_MAX_TURNS = int(_get("SESSION_MAX_TURNS", "10"))
 
