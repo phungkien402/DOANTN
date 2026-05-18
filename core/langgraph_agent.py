@@ -371,7 +371,12 @@ def node_clarifier(state: AgentState) -> dict:
 
     print(f"[AGENT] Node: Clarifier | count={count} | chunks={len(fast_chunks)}")
 
-    if fast_chunks and _client is not None:
+    # Reuse saved options from first clarification turn to keep ordering consistent
+    existing_options = _session_mgr.get_clarification_options(session_id) if _session_mgr else ""
+    if existing_options:
+        answer = existing_options
+        print(f"[AGENT] Node: Clarifier | reusing saved options from Turn 1")
+    elif fast_chunks and _client is not None:
         # Build choice list from fast_chunks subjects
         choices = "\n".join(
             f"{i}. {c.metadata.get('subject', c.text[:60])}"
@@ -393,8 +398,15 @@ def node_clarifier(state: AgentState) -> dict:
         except Exception as e:
             print(f"[AGENT] Clarifier LLM failed: {e}, using fallback template")
             answer = _clarifier_fallback(query, fast_chunks, count)
+
+        # Save options for subsequent turns
+        if _session_mgr:
+            _session_mgr.set_clarification_options(session_id, answer)
     else:
         answer = _clarifier_fallback(query, fast_chunks, count)
+        # Save fallback options too
+        if _session_mgr:
+            _session_mgr.set_clarification_options(session_id, answer)
 
     print(f"[AGENT] Node: Clarifier | answer=\"{answer[:80]}...\"")
 
