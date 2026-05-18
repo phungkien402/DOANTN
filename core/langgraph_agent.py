@@ -160,21 +160,18 @@ def node_orchestrator(state: AgentState) -> dict:
             "intent": "clarify",
             "tool_called": "clarifier",
             "rewritten_query": search_query,
-            "user_intent": reasoning,
         }
     elif action == "ticket":
         return {
             "intent": "create_ticket",
             "tool_called": "ticket_creator",
             "rewritten_query": search_query,
-            "user_intent": reasoning,
         }
     else:  # answer
         return {
             "intent": "search_faq",
             "rewritten_query": search_query,
             "tool_called": "full_retriever",
-            "user_intent": reasoning,
         }
 
 
@@ -216,13 +213,12 @@ def node_generator(state: AgentState) -> dict:
     rewritten = state["rewritten_query"]
     chunks = state["chunks"]
     session_history = state.get("session_history", [])
-    user_intent = state.get("user_intent")
 
     print(f"[AGENT] Node: Generator | chunks={len(chunks)}")
 
     try:
         answer_text = generator.generate(
-            rewritten, chunks, session_history, user_intent=user_intent
+            rewritten, chunks, session_history
         )
     except Exception as e:
         print(f"[AGENT] Generator failed: {e}")

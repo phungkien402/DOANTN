@@ -47,22 +47,19 @@ CÂU HỎI HIỆN TẠI: {query}
 ---
 HƯỚNG DẪN QUYẾT ĐỊNH:
 
-1. action = "answer" — khi BẤT KỲ điều kiện nào sau đây đúng:
-   - Chunk #1 có score > 0.45 VÀ tiêu đề chunk #1 đề cập đúng đối tượng/chủ thể người dùng nhắc đến
-     (ví dụ: user nói "bảng kê" → chunk #1 có "bảng kê"; user nói "tài liệu chưa ký" → chunk #1 có "chưa ký")
-   - Câu hỏi + lịch sử hội thoại đủ để xác định rõ vấn đề cụ thể, dù query chưa hoàn chỉnh
-   → search_query = câu truy vấn tối ưu để tìm kiếm (tiếng Việt, cụ thể, bỏ từ thừa như "mình", "ấy", "nhỉ")
+1. action = "answer" — khi user đề cập rõ chủ thể cụ thể VÀ chunk #1 chứa đúng chủ thể đó.
+   Ví dụ chủ thể cụ thể: "bảng kê", "tài liệu chưa ký", "bệnh án", "phiếu thu", "phiếu khám",
+   "giấy ra viện", "bảng kê 6556", "phiếu chỉ định", v.v.
+   Ví dụ KHÔNG phải chủ thể cụ thể: "không in được", "bị lỗi", "không dùng được", "mình không làm được"
+   → search_query = câu truy vấn tối ưu, tiếng Việt, cụ thể, bỏ từ thừa ("mình", "ấy", "nhỉ", "vậy")
 
-2. action = "clarify" — CHỈ KHI CẢ HAI điều kiện sau đều đúng:
-   - Query hoàn toàn mơ hồ, không đề cập rõ chủ thể (ví dụ: "không in được", "bị lỗi", "không dùng được")
-   - Nhiều chunks có tiêu đề khác nhau đều có thể phù hợp
-   → clarify_message = liệt kê các trường hợp có thể theo danh sách đánh số, kết thúc bằng
-     "Nếu không có trường hợp nào phù hợp, bạn có thể mô tả chi tiết vấn đề bằng lời của mình."
-   → KHÔNG hỏi lại nếu lịch sử hội thoại cho thấy đã clarify 1 lần rồi — lúc đó dùng action="answer" hoặc "ticket"
+2. action = "clarify" — khi query không đề cập chủ thể cụ thể VÀ nhiều chunk có thể phù hợp.
+   → clarify_message = liệt kê các trường hợp từ chunks theo danh sách đánh số.
+     Kết thúc bằng: "Nếu không có trường hợp nào phù hợp, bạn có thể mô tả chi tiết vấn đề bằng lời của mình."
+   → KHÔNG clarify nếu lịch sử cho thấy đã hỏi lại 1 lần → dùng action="answer" hoặc "ticket"
 
-3. action = "ticket" — khi:
-   - Cả 3 chunks đều không liên quan đến vấn đề người dùng mô tả
-   - Hoặc lịch sử cho thấy đã clarify rồi nhưng vẫn không tìm được chunk phù hợp
+3. action = "ticket" — khi cả 3 chunks đều không liên quan đến vấn đề người dùng mô tả,
+   hoặc đã clarify rồi nhưng vẫn không tìm được chunk phù hợp.
 
 ---
 TRẢ LỜI THEO ĐỊNH DẠNG JSON (không giải thích thêm):
