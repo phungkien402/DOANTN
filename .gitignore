@@ -23,3 +23,5 @@ models/
 
 # Server-specific service files (contain credentials)
 scripts/ehc-monitor.service
+data/tickets.db
+data/unanswered.jsonl
