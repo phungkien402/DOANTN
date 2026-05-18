@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from config import RETRIEVER_TOP_K, RERANKER_TOP_N
+from config import RETRIEVER_TOP_K, RERANKER_TOP_N, CLARIFY_SPREAD_THRESHOLD
 from core.models import RetrievedChunk
 from core import retriever, reranker
 from core.query_rewriter import analyze_and_rewrite
@@ -38,6 +38,16 @@ def search_faq(query: str, session_history: list = None, saved_fast_chunks: list
     else:
         print(f"[SEARCH_FAQ] Step 1: Fast retrieve (top 3)")
         fast_chunks = retriever.retrieve(query, top_k=3)
+
+    # Step 1.5: Score-spread heuristic (first attempt only)
+    # If all fast_chunks have nearly identical scores, the query is ambiguous — skip LLM call.
+    if not saved_fast_chunks and len(fast_chunks) >= 2:
+        scores = [c.score for c in fast_chunks]
+        spread = max(scores) - min(scores)
+        print(f"[SEARCH_FAQ] Step 1.5: Score spread = {spread:.4f} (threshold={CLARIFY_SPREAD_THRESHOLD})")
+        if spread < CLARIFY_SPREAD_THRESHOLD:
+            print(f"[SEARCH_FAQ] Score spread too low → ambiguous query, early exit")
+            return [], query, None, "unclear", fast_chunks
 
     # Step 2: Analyze + rewrite
     # When saved_fast_chunks is provided (clarification loop), pass them as context so
