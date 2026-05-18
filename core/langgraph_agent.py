@@ -60,7 +60,7 @@ class AgentState(TypedDict):
     user_intent: Optional[str]    # intent description from orchestrator reasoning
     session_history: list         # conversation history
     session_id: str               # needed for session tracking
-    collection: str               # "faq" | "manual"
+    tool: str                     # "search_faq" | "search_manual"
 
 
 # --- Maintenance mode ---
@@ -203,17 +203,17 @@ def node_orchestrator(state: AgentState) -> dict:
             "intent": "search_faq",
             "rewritten_query": search_query,
             "tool_called": "full_retriever",
-            "collection": result.get("collection", "faq"),
+            "tool": result.get("tool", "search_faq"),
         }
 
 
 def node_full_retriever(state: AgentState) -> dict:
     """Full retrieve (top K) + rerank (top N) using the orchestrator's search_query."""
     rewritten = state.get("rewritten_query", state["query"])
-    collection = state.get("collection", "faq")
-    print(f"[AGENT] Node: FullRetriever | collection={collection} | query=\"{rewritten}\"")
+    tool = state.get("tool", "search_faq")
+    print(f"[AGENT] Node: FullRetriever | tool={tool} | query=\"{rewritten}\"")
 
-    if collection == "manual":
+    if tool == "search_manual":
         from core.tools.search_manual import search_manual
         ranked_chunks, top_score = search_manual(rewritten)
     else:
@@ -224,7 +224,7 @@ def node_full_retriever(state: AgentState) -> dict:
         ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
         top_score = ranked_chunks[0].score if ranked_chunks else 0.0
 
-    print(f"[AGENT] Node: FullRetriever | collection={collection} | top_score={top_score:.4f}")
+    print(f"[AGENT] Node: FullRetriever | tool={tool} | top_score={top_score:.4f}")
     return {"chunks": ranked_chunks, "confidence": top_score}
 
 
@@ -397,7 +397,7 @@ def run(message: Message, session_history: list) -> Answer:
         "user_intent": None,
         "session_history": session_history,
         "session_id": message.session_id,
-        "collection": "faq",
+        "tool": "search_faq",
     }
 
     result = app.invoke(initial_state)

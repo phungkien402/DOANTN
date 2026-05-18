@@ -1,8 +1,10 @@
 """
-search_manual.py — Retrieve from ehc_manual collection (HDSD docs).
+search_manual.py — Dual-collection retriever for how-to / workflow queries.
 
-Pattern: retrieve top 10 → rerank top 3 → return (chunks, top_score).
-No clarification loop — straightforward retrieval.
+Searches both ehc_manual (HDSD) and doantn_faq, reranks together.
+Used when user asks about procedures, configuration, or step-by-step instructions.
+
+Pattern: retrieve top 5 from each collection → merge → rerank top 3.
 
 Run standalone: python3 -m core.tools.search_manual
 """
@@ -12,26 +14,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 
-from config import QDRANT_URL, EMBED_MODEL
+from config import QDRANT_URL, QDRANT_COLLECTION, RERANKER_TOP_N
 from core.models import RetrievedChunk
-from core import reranker
+from core import reranker, retriever as faq_retriever
 
 MANUAL_COLLECTION = "ehc_manual"
 
-# Module-level singletons
-_model = None
+# Lazy-loaded Qdrant client for manual collection
 _client = None
-
-
-def _get_model():
-    global _model
-    if _model is None:
-        print(f"[SEARCH_MANUAL] Loading embedding model: {EMBED_MODEL}")
-        _model = SentenceTransformer(EMBED_MODEL, device="cpu")
-    return _model
 
 
 def _get_client():
@@ -41,31 +33,18 @@ def _get_client():
     return _client
 
 
-def search_manual(query: str, top_k: int = 10, top_n: int = 3) -> tuple[list[RetrievedChunk], float]:
-    """
-    Retrieve from ehc_manual collection: top_k retrieve → top_n rerank.
-    Returns (ranked_chunks, top_score).
-    """
-    print(f"[SEARCH_MANUAL] query=\"{query}\" top_k={top_k} top_n={top_n}")
+def _retrieve_manual(query: str, top_k: int = 5) -> list[RetrievedChunk]:
+    """Retrieve from ehc_manual collection using the shared embedding model."""
+    # Reuse the embedding model already loaded by core.retriever
+    query_vector = faq_retriever._model.encode(query).tolist()
 
-    model = _get_model()
     client = _get_client()
-
-    # Embed query
-    query_vector = model.encode(query).tolist()
-
-    # Search Qdrant
     results = client.search(
         collection_name=MANUAL_COLLECTION,
         query_vector=query_vector,
         limit=top_k,
     )
 
-    if not results:
-        print("[SEARCH_MANUAL] No results found")
-        return [], 0.0
-
-    # Convert to RetrievedChunk
     chunks = []
     for r in results:
         chunk = RetrievedChunk(
@@ -73,23 +52,45 @@ def search_manual(query: str, top_k: int = 10, top_n: int = 3) -> tuple[list[Ret
             score=r.score,
             metadata={
                 "chunk_id": r.payload.get("chunk_id"),
-                "source": r.payload.get("source"),
+                "source": r.payload.get("source", "manual"),
                 "subject": r.payload.get("subject"),
                 "description": r.payload.get("description"),
                 "url": "",
             },
         )
         chunks.append(chunk)
+    return chunks
 
-    print(f"[SEARCH_MANUAL] Retrieved {len(chunks)} chunks, reranking to top {top_n}...")
 
-    # Rerank
-    ranked_chunks = reranker.rerank(query, chunks, top_n=top_n)
+def search_manual(query: str, top_k: int = 5, top_n: int = None) -> tuple[list[RetrievedChunk], float]:
+    """
+    Dual-collection retrieval: ehc_manual + doantn_faq → merge → rerank.
+    Returns (ranked_chunks, top_score).
+    """
+    if top_n is None:
+        top_n = RERANKER_TOP_N
+
+    print(f"[SEARCH_MANUAL] query=\"{query}\" top_k={top_k} top_n={top_n}")
+
+    # Retrieve from both collections
+    manual_chunks = _retrieve_manual(query, top_k=top_k)
+    faq_chunks = faq_retriever.retrieve(query, top_k=top_k)
+
+    print(f"[SEARCH_MANUAL] ehc_manual: {len(manual_chunks)} chunks, doantn_faq: {len(faq_chunks)} chunks")
+
+    all_chunks = manual_chunks + faq_chunks
+    if not all_chunks:
+        print("[SEARCH_MANUAL] No results from either collection")
+        return [], 0.0
+
+    # Rerank merged results
+    ranked_chunks = reranker.rerank(query, all_chunks, top_n=top_n)
     top_score = ranked_chunks[0].score if ranked_chunks else 0.0
 
     print(f"[SEARCH_MANUAL] {len(ranked_chunks)} chunks after rerank, top_score={top_score:.4f}")
     for i, c in enumerate(ranked_chunks, 1):
-        print(f"  #{i} score={c.score:.4f} | {c.metadata.get('subject', 'N/A')}")
+        src = c.metadata.get("source", "faq")
+        print(f"  #{i} score={c.score:.4f} [{src}] | {c.metadata.get('subject', 'N/A')[:60]}")
 
     return ranked_chunks, top_score
 
