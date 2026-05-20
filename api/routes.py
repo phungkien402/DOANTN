@@ -511,7 +511,7 @@ async def stats_tickets():
         cur.execute("SELECT COUNT(*) FROM tickets")
         result["total"] = cur.fetchone()[0]
 
-        cur.execute("SELECT COUNT(*) FROM tickets WHERE status = 'pending'")
+        cur.execute("SELECT COUNT(*) FROM tickets WHERE status = 'open'")
         result["pending"] = cur.fetchone()[0]
 
         cur.execute("SELECT COUNT(*) FROM tickets WHERE status = 'pushed'")
@@ -519,11 +519,20 @@ async def stats_tickets():
 
         # Recent 20
         cur.execute(
-            "SELECT ticket_id, user_id, question, created_at, status "
-            "FROM tickets ORDER BY created_at DESC LIMIT 20"
+            "SELECT id, assigned_to, query, timestamp, status "
+            "FROM tickets ORDER BY timestamp DESC LIMIT 20"
         )
         rows = cur.fetchall()
-        result["recent"] = [dict(row) for row in rows]
+        result["recent"] = [
+            {
+                "ticket_id": row["id"],
+                "user_id": row["assigned_to"] or "",
+                "question": row["query"],
+                "created_at": row["timestamp"],
+                "status": row["status"],
+            }
+            for row in rows
+        ]
 
         conn.close()
     except Exception:
