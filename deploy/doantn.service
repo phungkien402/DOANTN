@@ -1,0 +1,18 @@
+[Unit]
+Description=DOANTN FastAPI Server
+After=network.target ehc-vllm.service
+Wants=ehc-vllm.service
+
+[Service]
+Type=simple
+User=phungkien
+WorkingDirectory=/home/phungkien/DOANTN
+Environment="PATH=/home/phungkien/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/phungkien/.local/bin/uvicorn api.routes:app --host 0.0.0.0 --port 8001
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHC Helpdesk — Admin Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+.header .last-updated {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.tab-btn {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+.tab-btn:hover { background: #334155; color: #e2e8f0; }
+.tab-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  padding: 1.2rem;
+}
+.card-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+.card-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+.card-value.warning { color: #f59e0b; }
+.card-value.danger { color: #ef4444; }
+
+/* Chart */
+.chart-container {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  padding: 1.2rem;
+  margin-bottom: 1.5rem;
+  max-height: 300px;
+}
+
+/* Platform breakdown */
+.platform-bar {
+  display: flex;
+  height: 2rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+.platform-bar div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Unanswered table */
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #cbd5e1;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+th, td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #334155;
+  font-size: 0.85rem;
+}
+th {
+  background: #334155;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+td { color: #cbd5e1; }
+tr:last-child td { border-bottom: none; }
+
+/* Health services */
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 0.8rem 1rem;
+}
+.service-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.service-dot.ok { background: #22c55e; }
+.service-dot.error { background: #ef4444; }
+.service-dot.timeout { background: #f59e0b; }
+.service-name { font-weight: 500; }
+.service-status { margin-left: auto; font-size: 0.8rem; color: #64748b; }
+
+/* Progress bars */
+.resource-item {
+  margin-bottom: 1rem;
+}
+.resource-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
+}
+.resource-label { color: #94a3b8; }
+.resource-value { color: #e2e8f0; font-weight: 500; }
+.progress-bar {
+  height: 1.2rem;
+  background: #334155;
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 0.4rem;
+  transition: width 0.5s ease;
+}
+
+/* GPU section */
+.gpu-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+}
+.gpu-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #e2e8f0;
+}
+.gpu-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* Tickets summary */
+.tickets-summary {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+.tickets-summary strong { color: #e2e8f0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏥 EHC Helpdesk — Admin Dashboard</h1>
+  <span class="last-updated" id="lastUpdated">Đang tải...</span>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('stats')">Thống kê</button>
+  <button class="tab-btn" onclick="switchTab('health')">Sức khoẻ hệ thống</button>
+</div>
+
+<!-- TAB 1: Thống kê -->
+<div class="tab-content active" id="tab-stats">
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Tổng lượt hỏi</div>
+      <div class="card-value" id="totalQueries">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Tỷ lệ Fallback</div>
+      <div class="card-value" id="fallbackRate">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Avg Latency</div>
+      <div class="card-value" id="avgLatency">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Avg Confidence</div>
+      <div class="card-value" id="avgConfidence">—</div>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="queriesChart"></canvas>
+  </div>
+
+  <div class="section-title">Nền tảng</div>
+  <div class="platform-bar" id="platformBar"></div>
+
+  <div class="section-title">Top câu hỏi chưa trả lời được</div>
+  <table id="unansweredTable">
+    <thead>
+      <tr><th>#</th><th>Câu hỏi</th><th>Số lần</th><th>Lần cuối</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- TAB 2: Sức khoẻ hệ thống -->
+<div class="tab-content" id="tab-health">
+  <div class="section-title">Services</div>
+  <div class="services-grid" id="servicesGrid"></div>
+
+  <div class="section-title">Resources</div>
+  <div id="resourcesSection"></div>
+
+  <div class="section-title">GPU</div>
+  <div id="gpuSection"></div>
+
+  <div class="section-title">Tickets</div>
+  <div class="tickets-summary" id="ticketsSummary"></div>
+  <table id="ticketsTable">
+    <thead>
+      <tr><th>ID</th><th>User</th><th>Câu hỏi</th><th>Thời gian</th><th>Trạng thái</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+// --- Tab switching ---
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// --- Color helpers ---
+function getResourceColor(percent) {
+  if (percent > 85) return '#ef4444';
+  if (percent >= 70) return '#f59e0b';
+  return '#22c55e';
+}
+
+function getStatusColor(status) {
+  if (status === 'ok') return '#22c55e';
+  if (status === 'timeout') return '#f59e0b';
+  return '#ef4444';
+}
+
+// --- Chart instance ---
+let queriesChart = null;
+
+// --- Fetch and render ---
+async function fetchAll() {
+  try {
+    const [queryRes, healthRes, resourceRes, ticketRes] = await Promise.all([
+      fetch('/admin/stats/queries').then(r => r.json()),
+      fetch('/admin/stats/health').then(r => r.json()),
+      fetch('/admin/stats/resources').then(r => r.json()),
+      fetch('/admin/stats/tickets').then(r => r.json()),
+    ]);
+    renderQueries(queryRes);
+    renderHealth(healthRes);
+    renderResources(resourceRes);
+    renderTickets(ticketRes);
+    document.getElementById('lastUpdated').textContent =
+      'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
+  } catch (err) {
+    console.error('Dashboard fetch error:', err);
+  }
+}
+
+function renderQueries(data) {
+  document.getElementById('totalQueries').textContent = data.total_queries;
+
+  const fbEl = document.getElementById('fallbackRate');
+  fbEl.textContent = (data.fallback_rate * 100).toFixed(1) + '%';
+  fbEl.className = 'card-value' + (data.fallback_rate > 0.2 ? ' danger' : data.fallback_rate > 0.1 ? ' warning' : '');
+
+  const latEl = document.getElementById('avgLatency');
+  latEl.textContent = (data.avg_latency_ms / 1000).toFixed(2) + 's';
+
+  document.getElementById('avgConfidence').textContent = (data.avg_confidence * 100).toFixed(0) + '%';
+
+  // Bar chart
+  const labels = data.by_day.map(d => d.date.slice(5)); // MM-DD
+  const counts = data.by_day.map(d => d.count);
+  const fallbacks = data.by_day.map(d => d.fallbacks);
+
+  if (queriesChart) queriesChart.destroy();
+  const ctx = document.getElementById('queriesChart').getContext('2d');
+  queriesChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Tổng queries',
+          data: counts,
+          backgroundColor: '#3b82f6',
+          borderRadius: 4,
+        },
+        {
+          label: 'Fallbacks',
+          data: fallbacks,
+          backgroundColor: '#ef4444',
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8' } },
+      },
+      scales: {
+        x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b' }, grid: { color: '#334155' }, beginAtZero: true },
+      },
+    },
+  });
+
+  // Platform bar
+  const platformBar = document.getElementById('platformBar');
+  const total = Object.values(data.by_platform).reduce((a, b) => a + b, 0) || 1;
+  const colors = { telegram: '#0088cc', zalo: '#0068ff', web: '#22c55e', slack: '#4a154b' };
+  platformBar.innerHTML = Object.entries(data.by_platform)
+    .map(([p, c]) => {
+      const pct = ((c / total) * 100).toFixed(1);
+      return `<div style="width:${pct}%;background:${colors[p] || '#6366f1'}">${p} ${pct}%</div>`;
+    })
+    .join('');
+
+  // Unanswered table
+  const tbody = document.querySelector('#unansweredTable tbody');
+  tbody.innerHTML = data.top_unanswered
+    .map((item, i) =>
+      `<tr><td>${i + 1}</td><td>${escapeHtml(item.question)}</td><td>${item.count} lần</td><td>${item.last_seen}</td></tr>`
+    )
+    .join('');
+}
+
+function renderHealth(data) {
+  const grid = document.getElementById('servicesGrid');
+  const services = ['fastapi', 'qdrant', 'vllm', 'redis'];
+  grid.innerHTML = services
+    .map(s => {
+      const status = data[s] || 'unknown';
+      return `
+        <div class="service-item">
+          <span class="service-dot ${status}"></span>
+          <span class="service-name">${s}</span>
+          <span class="service-status">${status}</span>
+        </div>`;
+    })
+    .join('');
+}
+
+function renderResources(data) {
+  const section = document.getElementById('resourcesSection');
+  const items = [
+    { label: 'CPU', percent: data.cpu_percent, detail: '' },
+    { label: 'RAM', percent: data.ram_percent, detail: `${data.ram_used_gb} / ${data.ram_total_gb} GB` },
+    { label: 'Disk', percent: data.disk_percent, detail: `${data.disk_used_gb} / ${data.disk_total_gb} GB` },
+  ];
+  section.innerHTML = items
+    .map(item => `
+      <div class="resource-item">
+        <div class="resource-header">
+          <span class="resource-label">${item.label}</span>
+          <span class="resource-value">${item.percent.toFixed(1)}% ${item.detail ? '(' + item.detail + ')' : ''}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${item.percent}%;background:${getResourceColor(item.percent)}"></div>
+        </div>
+      </div>`)
+    .join('');
+
+  // GPU
+  const gpuSection = document.getElementById('gpuSection');
+  if (!data.gpu || data.gpu.length === 0) {
+    gpuSection.innerHTML = '<p style="color:#64748b;font-size:0.85rem;">Không phát hiện GPU</p>';
+    return;
+  }
+  gpuSection.innerHTML = data.gpu
+    .map(g => `
+      <div class="gpu-card">
+        <div class="gpu-title">GPU ${g.index} — ${g.name}</div>
+        <div class="resource-item">
+          <div class="resource-header">
+            <span class="resource-label">VRAM</span>
+            <span class="resource-value">${g.vram_percent}% (${(g.vram_used_mb / 1024).toFixed(1)} / ${(g.vram_total_mb / 1024).toFixed(1)} GB)</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${g.vram_percent}%;background:${getResourceColor(g.vram_percent)}"></div>
+          </div>
+        </div>
+        <div class="gpu-stats">
+          <span>🌡️ Temp: ${g.temperature_c}°C</span>
+          <span>⚡ Util: ${g.utilization_percent}%</span>
+        </div>
+      </div>`)
+    .join('');
+}
+
+function renderTickets(data) {
+  const summary = document.getElementById('ticketsSummary');
+  summary.innerHTML = `
+    <span>Tổng: <strong>${data.total}</strong></span>
+    <span>Đang chờ: <strong>${data.pending}</strong></span>
+    <span>Đã đẩy Redmine: <strong>${data.pushed_to_redmine}</strong></span>
+  `;
+
+  const tbody = document.querySelector('#ticketsTable tbody');
+  tbody.innerHTML = (data.recent || [])
+    .map(t => `
+      <tr>
+        <td>${escapeHtml(t.ticket_id || '')}</td>
+        <td>${escapeHtml(t.user_id || '')}</td>
+        <td>${escapeHtml(t.question || '')}</td>
+        <td>${t.created_at || ''}</td>
+        <td>${t.status || ''}</td>
+      </tr>`)
+    .join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// --- Init ---
+fetchAll();
+setInterval(fetchAll, 30000);
+</script>
+</body>
+</html>

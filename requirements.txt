@@ -1,0 +1,28 @@
+# LLM & Embeddings
+vllm==0.5.5
+sentence-transformers==3.3.1
+
+# Reranker
+FlagEmbedding==1.4.0
+
+# Vector DB
+qdrant-client==1.12.1
+
+# API
+fastapi==0.136.1
+uvicorn==0.45.0
+python-multipart==0.0.26
+httpx==0.28.1
+
+# Slack
+slack-sdk==3.41.0
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.13.3
+loguru==0.7.3
+openai==2.36.0
+
+# Monitoring
+psutil>=5.9.0
+pynvml>=11.5.0

@@ -1,0 +1,1 @@
+# core — RAG pipeline modules
