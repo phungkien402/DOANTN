@@ -22,3 +22,7 @@ python-dotenv==1.0.1
 pydantic==2.13.3
 loguru==0.7.3
 openai==2.36.0
+
+# Monitoring
+psutil>=5.9.0
+pynvml>=11.5.0

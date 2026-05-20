@@ -27,6 +27,7 @@ class QueryLog:
     confidence: float
     is_fallback: bool
     top_chunk_subject: str  # FAQ title used (empty string if fallback)
+    latency_ms: float = 0.0  # pipeline processing time in milliseconds
 
 
 class QueryLogger:
@@ -35,7 +36,7 @@ class QueryLogger:
     def __init__(self, log_path: str = "logs/queries.jsonl"):
         self._log_path = log_path
 
-    def log(self, message, answer) -> None:
+    def log(self, message, answer, latency_ms: float = 0.0) -> None:
         """
         Log a query and its answer.
         Uses answer.rewritten_question for the rewritten field.
@@ -54,6 +55,7 @@ class QueryLogger:
                 answer.source_chunks[0].metadata.get("subject", "")
                 if answer.source_chunks else ""
             ),
+            latency_ms=latency_ms,
         )
         with open(self._log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")

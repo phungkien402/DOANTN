@@ -11,12 +11,13 @@ Run: uvicorn api.routes:app --host 0.0.0.0 --port 8080
 
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 from rq import Queue
@@ -148,14 +149,16 @@ async def handle_webhook(platform: str, request: Request, background_tasks: Back
         return {"ok": True}
 
     # --- Other platforms: synchronous processing ---
+    t0 = time.time()
     answer = run_pipeline(message, session_history)
+    latency_ms = (time.time() - t0) * 1000
 
     # Store turns in session
     _session_mgr.add_turn(message.session_id, "user", message.text)
     _session_mgr.add_turn(message.session_id, "bot", answer.text)
 
     # Log the query
-    _logger.log(message, answer)
+    _logger.log(message, answer, latency_ms=latency_ms)
 
     # Format response for platform
     response_text = adapter.format_response(
@@ -286,3 +289,253 @@ async def traces_ui():
     if ui_path.exists():
         return FileResponse(str(ui_path))
     return JSONResponse({"error": "traces.html not found"}, status_code=404)
+
+
+# ---------------------------------------------------------------------------
+# rtk: Admin Monitoring Dashboard
+# ---------------------------------------------------------------------------
+
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Serve the admin monitoring dashboard."""
+    html_path = Path(__file__).parent.parent / "ui" / "dashboard.html"
+    if html_path.exists():
+        html = html_path.read_text(encoding="utf-8")
+        return HTMLResponse(content=html)
+    return HTMLResponse(content="<h1>dashboard.html not found</h1>", status_code=404)
+
+
+@app.get("/admin/stats/queries")
+async def stats_queries(days: int = 7):
+    """Aggregated query statistics from logs/queries.jsonl."""
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+    from collections import defaultdict
+
+    log_path = Path(__file__).parent.parent / "logs" / "queries.jsonl"
+    unanswered_path = Path(__file__).parent.parent / "data" / "unanswered.jsonl"
+
+    now = datetime.now(timezone.utc)
+    cutoff_ts = (now - timedelta(days=days)).timestamp()
+
+    total_queries = 0
+    total_fallbacks = 0
+    confidence_sum = 0.0
+    latency_sum = 0.0
+    latency_count = 0
+    by_day: dict[str, dict] = defaultdict(lambda: {"count": 0, "fallbacks": 0})
+    by_platform: dict[str, int] = defaultdict(int)
+
+    if log_path.exists():
+        with open(log_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                ts = entry.get("timestamp", 0)
+                if ts < cutoff_ts:
+                    continue
+                total_queries += 1
+                if entry.get("is_fallback"):
+                    total_fallbacks += 1
+                confidence_sum += entry.get("confidence", 0.0)
+                lat = entry.get("latency_ms", 0.0)
+                if lat > 0:
+                    latency_sum += lat
+                    latency_count += 1
+                day_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+                by_day[day_str]["count"] += 1
+                if entry.get("is_fallback"):
+                    by_day[day_str]["fallbacks"] += 1
+                platform = entry.get("platform", "unknown")
+                by_platform[platform] += 1
+
+    # Sort by_day
+    sorted_days = sorted(by_day.items())
+    by_day_list = [{"date": d, "count": v["count"], "fallbacks": v["fallbacks"]} for d, v in sorted_days]
+
+    # Top unanswered
+    top_unanswered: list[dict] = []
+    if unanswered_path.exists():
+        question_counts: dict[str, dict] = {}
+        with open(unanswered_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                q = entry.get("question", "").strip()
+                if not q:
+                    continue
+                ts = entry.get("timestamp", 0)
+                last_seen = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else ""
+                if q in question_counts:
+                    question_counts[q]["count"] += 1
+                    if last_seen > question_counts[q]["last_seen"]:
+                        question_counts[q]["last_seen"] = last_seen
+                else:
+                    question_counts[q] = {"question": q, "count": 1, "last_seen": last_seen}
+        top_unanswered = sorted(question_counts.values(), key=lambda x: x["count"], reverse=True)[:10]
+
+    fallback_rate = (total_fallbacks / total_queries) if total_queries > 0 else 0.0
+    avg_confidence = (confidence_sum / total_queries) if total_queries > 0 else 0.0
+    avg_latency_ms = (latency_sum / latency_count) if latency_count > 0 else 0.0
+
+    return {
+        "total_queries": total_queries,
+        "total_fallbacks": total_fallbacks,
+        "fallback_rate": round(fallback_rate, 4),
+        "avg_confidence": round(avg_confidence, 4),
+        "avg_latency_ms": round(avg_latency_ms, 1),
+        "by_day": by_day_list,
+        "by_platform": dict(by_platform),
+        "top_unanswered": top_unanswered,
+    }
+
+
+@app.get("/admin/stats/health")
+async def stats_health():
+    """Check all service dependencies with per-service timeouts."""
+    import asyncio
+    import httpx
+
+    async def check_service(name: str, url: str) -> tuple[str, str]:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                resp = await client.get(url)
+                return (name, "ok" if resp.status_code < 500 else "error")
+        except httpx.TimeoutException:
+            return (name, "timeout")
+        except Exception:
+            return (name, "error")
+
+    async def check_redis() -> tuple[str, str]:
+        try:
+            pong = _redis_conn.ping()
+            return ("redis", "ok" if pong else "error")
+        except Exception:
+            return ("redis", "error")
+
+    results = await asyncio.gather(
+        check_service("fastapi", "http://localhost:8001/health"),
+        check_service("qdrant", "http://localhost:6333/healthz"),
+        check_service("vllm", "http://localhost:8000/health"),
+        check_redis(),
+        return_exceptions=True,
+    )
+
+    health_map: dict[str, str] = {}
+    for r in results:
+        if isinstance(r, tuple):
+            health_map[r[0]] = r[1]
+        else:
+            # Exception from gather
+            health_map["unknown"] = "error"
+
+    health_map["timestamp"] = time.time()  # type: ignore[assignment]
+    return health_map
+
+
+@app.get("/admin/stats/resources")
+async def stats_resources():
+    """System resource snapshot: CPU, RAM, Disk, GPU."""
+    import psutil
+
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage("/")
+
+    gpu_list: list[dict] = []
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        device_count = pynvml.nvmlDeviceGetCount()
+        for i in range(device_count):
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            name = pynvml.nvmlDeviceGetName(handle)
+            if isinstance(name, bytes):
+                name = name.decode("utf-8")
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            gpu_list.append({
+                "index": i,
+                "name": name,
+                "vram_used_mb": round(mem_info.used / (1024 ** 2)),
+                "vram_total_mb": round(mem_info.total / (1024 ** 2)),
+                "vram_percent": round(mem_info.used / mem_info.total * 100, 1),
+                "temperature_c": temp,
+                "utilization_percent": util.gpu,
+            })
+        pynvml.nvmlShutdown()
+    except Exception:
+        gpu_list = []
+
+    return {
+        "cpu_percent": cpu_percent,
+        "ram_used_gb": round(mem.used / (1024 ** 3), 1),
+        "ram_total_gb": round(mem.total / (1024 ** 3), 1),
+        "ram_percent": mem.percent,
+        "disk_used_gb": round(disk.used / (1024 ** 3), 1),
+        "disk_total_gb": round(disk.total / (1024 ** 3), 1),
+        "disk_percent": round(disk.used / disk.total * 100, 1),
+        "gpu": gpu_list,
+    }
+
+
+@app.get("/admin/stats/tickets")
+async def stats_tickets():
+    """Ticket summary from SQLite."""
+    import sqlite3
+
+    db_path = Path(__file__).parent.parent / "data" / "tickets.db"
+    result = {"total": 0, "pending": 0, "pushed_to_redmine": 0, "recent": []}
+
+    if not db_path.exists():
+        return result
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        # Total counts
+        cur.execute("SELECT COUNT(*) FROM tickets")
+        result["total"] = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM tickets WHERE status = 'open'")
+        result["pending"] = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM tickets WHERE status = 'pushed'")
+        result["pushed_to_redmine"] = cur.fetchone()[0]
+
+        # Recent 20
+        cur.execute(
+            "SELECT id, assigned_to, query, timestamp, status "
+            "FROM tickets ORDER BY timestamp DESC LIMIT 20"
+        )
+        rows = cur.fetchall()
+        result["recent"] = [
+            {
+                "ticket_id": row["id"],
+                "user_id": row["assigned_to"] or "",
+                "question": row["query"],
+                "created_at": row["timestamp"],
+                "status": row["status"],
+            }
+            for row in rows
+        ]
+
+        conn.close()
+    except Exception:
+        pass
+
+    return result
