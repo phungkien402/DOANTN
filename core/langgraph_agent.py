@@ -33,6 +33,7 @@ from core.knowledge_store import rebuild_index
 from core import generator, confidence, retriever, reranker
 from core.abbreviations import expand_abbreviations
 from core.langfuse_tracer import new_trace, log_span, end_trace
+from core.trace_logger import start_trace as tl_start, log_event as tl_event, finish_trace as tl_finish
 
 # Rebuild knowledge index at startup so _index.json is always fresh
 rebuild_index()
@@ -70,6 +71,7 @@ class AgentState(TypedDict):
     knowledge_topic: str          # stem of knowledge file to load (or "")
     knowledge_content: str        # loaded knowledge file body (or "")
     lf_trace: Any                 # Langfuse trace object (or None)
+    trace_id: str                 # unique per query run (for trace_logger)
 
 
 # --- Maintenance mode ---
@@ -100,17 +102,30 @@ def node_query_analyzer(state: AgentState) -> dict:
     """Classify query: EHC-related or off-topic."""
     query = state["query"]
     session_id = state.get("session_id", "")
+    trace_id = state.get("trace_id", "")
     print(f"\n[AGENT] Node: QueryAnalyzer | query=\"{query}\"")
+
+    t_start = time.time()
 
     # Bypass classifier if mid-clarification — let Orchestrator handle via history
     if _session_mgr and _session_mgr.is_awaiting_clarification(session_id):
         print(f"[AGENT] Classifier: BYPASS (awaiting_clarification=True)")
+        elapsed = (time.time() - t_start) * 1000
+        tl_event(trace_id, "IntentGuard", "decision", {
+            "result": True, "bypass": True, "duration_ms": round(elapsed, 1),
+        }, duration_ms=round(elapsed, 1))
         return {
             "is_ehc_related": True,
             "intent": "search_faq",
         }
 
     is_off_topic = classify(query)
+    elapsed = (time.time() - t_start) * 1000
+
+    is_ehc = not is_off_topic
+    tl_event(trace_id, "IntentGuard", "decision", {
+        "result": is_ehc, "query": query, "duration_ms": round(elapsed, 1),
+    }, duration_ms=round(elapsed, 1))
 
     if is_off_topic:
         print(f"[AGENT] Classifier: NO (off-topic)")
@@ -142,13 +157,22 @@ def node_fast_retriever(state: AgentState) -> dict:
     """Fast retrieve top chunks from BOTH collections for orchestrator context."""
     query = state["query"]
     session_id = state.get("session_id", "")
+    trace_id = state.get("trace_id", "")
     print(f"[AGENT] Node: FastRetriever | query=\"{query}\"")
+
+    t_start = time.time()
 
     # Reuse saved fast_chunks from clarification turn if available
     if _session_mgr:
         saved = _session_mgr.get_fast_chunks(session_id)
         if saved:
             print(f"[AGENT] Node: FastRetriever | reusing {len(saved)} saved chunks")
+            elapsed = (time.time() - t_start) * 1000
+            tl_event(trace_id, "FastRetriever", "end", {
+                "chunks": [{"subject": c.metadata.get("subject", "")[:60], "score": round(c.score, 4)} for c in saved],
+                "reused": True,
+                "duration_ms": round(elapsed, 1),
+            }, duration_ms=round(elapsed, 1))
             return {"fast_chunks": saved}
 
     # Expand abbreviations before retrieval
@@ -166,6 +190,12 @@ def node_fast_retriever(state: AgentState) -> dict:
         src = c.metadata.get("source", "faq")
         print(f"[RETRIEVER] #{i} score={c.score:.3f} [{src}] | {c.metadata.get('subject','')[:60]}")
 
+    elapsed = (time.time() - t_start) * 1000
+    tl_event(trace_id, "FastRetriever", "end", {
+        "chunks": [{"subject": c.metadata.get("subject", "")[:60], "score": round(c.score, 4)} for c in all_chunks],
+        "duration_ms": round(elapsed, 1),
+    }, duration_ms=round(elapsed, 1))
+
     print(f"[AGENT] Node: FastRetriever | {len(all_chunks)} chunks (faq+manual)")
     return {"fast_chunks": all_chunks}
 
@@ -176,6 +206,7 @@ def node_orchestrator(state: AgentState) -> dict:
     fast_chunks = state.get("fast_chunks", [])
     session_history = state.get("session_history", [])
     session_id = state.get("session_id", "")
+    trace_id = state.get("trace_id", "")
     lf_trace = state.get("lf_trace")
     print(f"[AGENT] Node: Orchestrator | query=\"{query}\"")
 
@@ -193,6 +224,8 @@ def node_orchestrator(state: AgentState) -> dict:
     clarify_msg = result.get("clarify_message", "")
     reasoning = result.get("reasoning", "")
 
+    elapsed = (time.time() - t_orch_start) * 1000
+
     log_span(
         lf_trace,
         "Orchestrator",
@@ -200,6 +233,16 @@ def node_orchestrator(state: AgentState) -> dict:
         output_data={"action": action, "tool": result.get("tool", ""), "reasoning": reasoning[:100]},
         start_time=t_orch_start,
     )
+
+    tl_event(trace_id, "Orchestrator", "decision", {
+        "action": action,
+        "tool": result.get("tool", ""),
+        "knowledge_topic": result.get("knowledge_topic", ""),
+        "reasoning": reasoning,
+        "search_query": search_query,
+        "clarify_message": clarify_msg[:200] if clarify_msg else "",
+        "duration_ms": round(elapsed, 1),
+    }, duration_ms=round(elapsed, 1))
 
     print(f"[AGENT] Node: Orchestrator | action={action} | search_query=\"{search_query}\"")
 
@@ -245,6 +288,7 @@ def node_full_retriever(state: AgentState) -> dict:
     rewritten = state.get("rewritten_query", state["query"])
     tool = state.get("tool", "search_faq")
     knowledge_topic = state.get("knowledge_topic", "")
+    trace_id = state.get("trace_id", "")
     lf_trace = state.get("lf_trace")
     print(f"[AGENT] Node: FullRetriever | tool={tool} | knowledge_topic={knowledge_topic} | query=\"{rewritten}\"")
 
@@ -256,6 +300,10 @@ def node_full_retriever(state: AgentState) -> dict:
         chunks = retriever.retrieve(rewritten, top_k=RETRIEVER_TOP_K)
         if not chunks:
             print(f"[AGENT] Node: FullRetriever | no chunks retrieved")
+            tl_event(trace_id, "FullRetriever", "end", {
+                "top_score": 0.0, "chunks": [], "knowledge_loaded": False,
+                "knowledge_topic": knowledge_topic, "duration_ms": 0.0,
+            }, duration_ms=0.0)
             return {"chunks": [], "confidence": 0.0, "knowledge_content": ""}
         ranked_chunks = reranker.rerank(rewritten, chunks, top_n=RERANKER_TOP_N)
         top_score = ranked_chunks[0].score if ranked_chunks else 0.0
@@ -269,6 +317,8 @@ def node_full_retriever(state: AgentState) -> dict:
             print(f"[AGENT] Node: FullRetriever | knowledge topic '{knowledge_topic}' not found, skipping")
             knowledge_content = ""
 
+    elapsed = (time.time() - t_ret_start) * 1000
+
     log_span(
         lf_trace,
         "FullRetriever",
@@ -277,6 +327,14 @@ def node_full_retriever(state: AgentState) -> dict:
         start_time=t_ret_start,
     )
 
+    tl_event(trace_id, "FullRetriever", "end", {
+        "top_score": round(top_score, 4),
+        "chunks": [{"subject": c.metadata.get("subject", "")[:60], "score": round(c.score, 4)} for c in ranked_chunks[:5]],
+        "knowledge_loaded": bool(knowledge_content),
+        "knowledge_topic": knowledge_topic,
+        "duration_ms": round(elapsed, 1),
+    }, duration_ms=round(elapsed, 1))
+
     print(f"[AGENT] Node: FullRetriever | tool={tool} | top_score={top_score:.4f} | knowledge={'yes' if knowledge_content else 'no'}")
     return {"chunks": ranked_chunks, "confidence": top_score, "knowledge_content": knowledge_content}
 
@@ -284,9 +342,17 @@ def node_full_retriever(state: AgentState) -> dict:
 def node_synthesizer(state: AgentState) -> dict:
     """Check rerank confidence and decide: generate answer or create ticket."""
     chunks = state["chunks"]
+    trace_id = state.get("trace_id", "")
 
     top_score = chunks[0].score if chunks else 0.0
     is_confident = chunks and confidence.is_confident(chunks[0], threshold=CONFIDENCE_THRESHOLD)
+
+    route = "generator" if is_confident else "ticket_creator"
+    tl_event(trace_id, "Synthesizer", "decision", {
+        "confidence": round(top_score, 4),
+        "threshold": CONFIDENCE_THRESHOLD,
+        "route": route,
+    })
 
     if is_confident:
         print(f"[AGENT] Node: Synthesizer | confidence={top_score:.4f} → CONFIDENT")
@@ -302,6 +368,7 @@ def node_generator(state: AgentState) -> dict:
     chunks = state["chunks"]
     session_history = state.get("session_history", [])
     knowledge_content = state.get("knowledge_content", "")
+    trace_id = state.get("trace_id", "")
     lf_trace = state.get("lf_trace")
 
     print(f"[AGENT] Node: Generator | chunks={len(chunks)} | knowledge={'yes' if knowledge_content else 'no'}")
@@ -319,6 +386,8 @@ def node_generator(state: AgentState) -> dict:
             "vui lòng thử lại sau 1–2 phút. Nếu vẫn lỗi, liên hệ bộ phận IT để kiểm tra server."
         )
 
+    elapsed = (time.time() - t_gen_start) * 1000
+
     log_span(
         lf_trace,
         "Generator",
@@ -326,6 +395,11 @@ def node_generator(state: AgentState) -> dict:
         output_data={"answer_len": len(answer_text)},
         start_time=t_gen_start,
     )
+
+    tl_event(trace_id, "Generator", "end", {
+        "answer_chars": len(answer_text),
+        "duration_ms": round(elapsed, 1),
+    }, duration_ms=round(elapsed, 1))
 
     print(f"[AGENT] Node: Generator | answer_len={len(answer_text)}")
     return {"answer": answer_text}
@@ -335,6 +409,7 @@ def node_ticket_creator(state: AgentState) -> dict:
     """Create a ticket for unresolvable queries."""
     query = state["query"]
     user_intent = state.get("user_intent")
+    trace_id = state.get("trace_id", "")
     print(f"[AGENT] Node: TicketCreator | query=\"{query}\"")
 
     ticket_id = save_ticket(
@@ -349,6 +424,12 @@ def node_ticket_creator(state: AgentState) -> dict:
         "Vui lòng nhắn lại yêu cầu vào nhóm Zalo hỗ trợ để được nhân viên kỹ thuật giải đáp."
     )
 
+    tl_event(trace_id, "Fallback", "info", {
+        "reason": "confidence_below_threshold",
+        "confidence": round(state.get("confidence", 0.0), 4),
+        "ticket_id": ticket_id,
+    })
+
     print(f"[AGENT] Node: TicketCreator | ticket_id={ticket_id}")
     return {
         "ticket_id": ticket_id,
@@ -359,9 +440,17 @@ def node_ticket_creator(state: AgentState) -> dict:
 def node_chat_fallback(state: AgentState) -> dict:
     """Generate a short polite off-topic response."""
     query = state["query"]
+    trace_id = state.get("trace_id", "")
     print(f"[AGENT] Node: ChatFallback | query=\"{query}\"")
 
+    t_start = time.time()
     answer = chat_fallback(query)
+    elapsed = (time.time() - t_start) * 1000
+
+    tl_event(trace_id, "ChatFallback", "end", {
+        "answer": answer[:100],
+        "duration_ms": round(elapsed, 1),
+    }, duration_ms=round(elapsed, 1))
 
     print(f"[AGENT] Node: ChatFallback | answer=\"{answer}\"")
     return {"answer": answer}
@@ -450,6 +539,10 @@ def run(message: Message, session_history: list) -> Answer:
 
     lf_trace = new_trace(query=message.text, session_id=message.session_id)
 
+    # Generate unique trace_id for trace_logger
+    trace_id = f"{message.user_id}-{int(time.time()*1000)}"
+    tl_start(trace_id, message.text, user_id=message.user_id, platform=message.platform)
+
     initial_state: AgentState = {
         "query": message.text,
         "is_ehc_related": False,
@@ -468,6 +561,7 @@ def run(message: Message, session_history: list) -> Answer:
         "knowledge_topic": "",
         "knowledge_content": "",
         "lf_trace": lf_trace,
+        "trace_id": trace_id,
     }
 
     result = app.invoke(initial_state)
@@ -489,6 +583,9 @@ def run(message: Message, session_history: list) -> Answer:
     tool_used = result.get("tool_called", result.get("intent", "unknown"))
     answered = conf >= CONFIDENCE_THRESHOLD and not is_fallback
     end_trace(lf_trace, tool=tool_used, confidence=conf, answered=answered)
+
+    # Finish trace_logger trace
+    tl_finish(trace_id, answer.text, is_fallback=answer.is_fallback)
 
     print(f"\n[AGENT] Done | tool={tool_used} confidence={conf:.4f}")
     return answer

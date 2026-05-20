@@ -11,13 +11,15 @@ Run: uvicorn api.routes:app --host 0.0.0.0 --port 8080
 
 import os
 import sys
+import json
 import time
+import asyncio
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from redis import Redis
 from rq import Queue
@@ -539,3 +541,68 @@ async def stats_tickets():
         pass
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Trace Viewer — independent from Langfuse
+# ---------------------------------------------------------------------------
+
+from core.trace_logger import list_traces as tl_list_traces, get_trace as tl_get_trace, subscribe_sse as tl_subscribe_sse
+
+
+@app.get("/admin/traces", response_class=HTMLResponse)
+async def traces_page():
+    """Serve the pipeline trace viewer UI."""
+    html_path = Path(__file__).parent.parent / "ui" / "traces.html"
+    if html_path.exists():
+        html = html_path.read_text(encoding="utf-8")
+        return HTMLResponse(content=html)
+    return HTMLResponse(content="<h1>traces.html not found</h1>", status_code=404)
+
+
+@app.get("/admin/traces/list")
+async def traces_list(limit: int = 50):
+    """Return recent traces as JSON summary list."""
+    return tl_list_traces(limit=limit)
+
+
+@app.get("/admin/traces/stream/{trace_id}")
+async def trace_stream(trace_id: str):
+    """SSE endpoint — streams events for a running trace."""
+    async def event_generator():
+        # First, send already-buffered events
+        trace = tl_get_trace(trace_id)
+        if trace:
+            for event in trace.get("events", []):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            if trace.get("finished_at"):
+                yield f"data: {json.dumps({'node': '__done__', 'type': 'done'})}\n\n"
+                return
+        # Then subscribe for future events
+        q = tl_subscribe_sse(trace_id)
+        if not q:
+            yield f"data: {json.dumps({'node': '__done__', 'type': 'not_found'})}\n\n"
+            return
+        while True:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=30.0)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("node") == "__done__":
+                    break
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/admin/traces/{trace_id}")
+async def trace_detail(trace_id: str):
+    """Return full trace detail by trace_id."""
+    trace = tl_get_trace(trace_id)
+    if not trace:
+        raise HTTPException(status_code=404, detail="Trace not found")
+    return trace

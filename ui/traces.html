@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EHC — Pipeline Trace Viewer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+  background: #0f172a;
+  color: #e2e8f0;
+  height: 100vh;
+  overflow: hidden;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+.header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+.header .status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+.header .status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.container {
+  display: flex;
+  height: calc(100vh - 49px);
+}
+/* Left panel */
+.left-panel {
+  width: 340px;
+  min-width: 340px;
+  border-right: 1px solid #334155;
+  overflow-y: auto;
+  background: #1e293b;
+}
+.left-panel .panel-title {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  border-bottom: 1px solid #334155;
+  position: sticky;
+  top: 0;
+  background: #1e293b;
+  z-index: 1;
+}
+.trace-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid #1e293b;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.trace-item:hover { background: #334155; }
+.trace-item.active { background: #334155; border-left: 3px solid #6366f1; }
+.trace-item .query {
+  font-size: 12px;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+.trace-item .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #64748b;
+}
+.trace-item .meta .time {
+  color: #94a3b8;
+}
+.trace-item .meta .badge {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+}
+.badge-live {
+  background: #22c55e20;
+  color: #22c55e;
+  animation: pulse 1.5s infinite;
+}
+.badge-fallback {
+  background: #ef444420;
+  color: #ef4444;
+}
+.badge-platform {
+  background: #6366f120;
+  color: #6366f1;
+}
+/* Right panel */
+.right-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+.right-panel .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #475569;
+  font-size: 14px;
+}
+.trace-header {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #334155;
+}
+.trace-header .query-text {
+  font-size: 14px;
+  color: #f8fafc;
+  margin-bottom: 6px;
+}
+.trace-header .trace-meta {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  gap: 16px;
+}
+/* Node cards */
+.node-card {
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.node-card:hover { border-color: #475569; }
+.node-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.node-card-header .left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.node-card-header .node-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.node-card-header .node-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+.node-card-header .node-summary {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: 8px;
+}
+.node-card-header .duration {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+/* Duration bar */
+.duration-bar-container {
+  height: 3px;
+  background: #1e293b;
+}
+.duration-bar {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+/* Node detail */
+.node-detail {
+  display: none;
+  padding: 8px 12px;
+  background: #0f172a;
+  border-top: 1px solid #334155;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+.node-detail.open { display: block; }
+.node-detail .detail-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.node-detail .detail-key {
+  color: #64748b;
+  min-width: 100px;
+}
+.node-detail .detail-value {
+  color: #e2e8f0;
+  word-break: break-word;
+}
+.node-detail .chunk-list {
+  margin-top: 4px;
+  padding-left: 12px;
+}
+.node-detail .chunk-item {
+  margin-bottom: 2px;
+}
+/* Node colors */
+.color-intentguard { background: #6366f1; }
+.color-fastretriever { background: #0ea5e9; }
+.color-orchestrator { background: #f59e0b; }
+.color-fullretriever { background: #0ea5e9; }
+.color-synthesizer { background: #8b5cf6; }
+.color-generator { background: #22c55e; }
+.color-fallback { background: #ef4444; }
+.color-chatfallback { background: #ef4444; }
+.color-ticketcreator { background: #ef4444; }
+
+.bar-intentguard { background: #6366f1; }
+.bar-fastretriever { background: #0ea5e9; }
+.bar-orchestrator { background: #f59e0b; }
+.bar-fullretriever { background: #0ea5e9; }
+.bar-synthesizer { background: #8b5cf6; }
+.bar-generator { background: #22c55e; }
+.bar-fallback { background: #ef4444; }
+.bar-chatfallback { background: #ef4444; }
+.bar-ticketcreator { background: #ef4444; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1e293b; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>EHC — Pipeline Trace Viewer</h1>
+  <div class="status">
+    <div class="dot"></div>
+    <span>Auto-refresh</span>
+  </div>
+</div>
+<div class="container">
+  <div class="left-panel">
+    <div class="panel-title">Recent Queries</div>
+    <div id="trace-list"></div>
+  </div>
+  <div class="right-panel">
+    <div id="trace-detail" class="empty-state">Select a trace to view details</div>
+  </div>
+</div>
+
+<script>
+const NODE_COLORS = {
+  IntentGuard: 'intentguard',
+  FastRetriever: 'fastretriever',
+  Orchestrator: 'orchestrator',
+  FullRetriever: 'fullretriever',
+  Synthesizer: 'synthesizer',
+  Generator: 'generator',
+  Fallback: 'fallback',
+  ChatFallback: 'chatfallback',
+  TicketCreator: 'ticketcreator',
+};
+
+let activeTraceId = null;
+let eventSource = null;
+
+// --- Left panel: list traces ---
+async function loadTraceList() {
+  try {
+    const resp = await fetch('/admin/traces/list?limit=50');
+    const traces = await resp.json();
+    renderTraceList(traces);
+  } catch (e) {
+    console.error('Failed to load traces:', e);
+  }
+}
+
+function renderTraceList(traces) {
+  const container = document.getElementById('trace-list');
+  container.innerHTML = traces.map(t => {
+    const isActive = t.trace_id === activeTraceId ? ' active' : '';
+    const isRunning = t.running;
+    const timeStr = t.total_ms != null ? `${(t.total_ms / 1000).toFixed(1)}s` : '...';
+    const dateStr = new Date(t.started_at * 1000).toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'});
+
+    let badges = '';
+    if (isRunning) badges += '<span class="badge badge-live">LIVE</span>';
+    if (t.is_fallback) badges += '<span class="badge badge-fallback">FALL</span>';
+    if (t.platform) badges += `<span class="badge badge-platform">${t.platform}</span>`;
+
+    return `
+      <div class="trace-item${isActive}" data-id="${t.trace_id}" onclick="selectTrace('${t.trace_id}', ${isRunning || false})">
+        <div class="query">${escapeHtml(t.query)}</div>
+        <div class="meta">
+          ${badges}
+          <span class="time">${timeStr}</span>
+          <span>${dateStr}</span>
+          <span>${t.node_count} nodes</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// --- Right panel: trace detail ---
+async function selectTrace(traceId, isRunning) {
+  activeTraceId = traceId;
+  // Highlight in list
+  document.querySelectorAll('.trace-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === traceId);
+  });
+
+  // Close existing SSE
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
+  }
+
+  if (isRunning) {
+    // Stream live events
+    renderTraceDetail({trace_id: traceId, query: '...', events: [], total_ms: null});
+    streamTrace(traceId);
+  } else {
+    // Fetch full trace
+    try {
+      const resp = await fetch(`/admin/traces/${traceId}`);
+      const trace = await resp.json();
+      renderTraceDetail(trace);
+    } catch (e) {
+      document.getElementById('trace-detail').innerHTML = '<div class="empty-state">Failed to load trace</div>';
+    }
+  }
+}
+
+function streamTrace(traceId) {
+  const container = document.getElementById('trace-detail');
+  eventSource = new EventSource(`/admin/traces/stream/${traceId}`);
+  let events = [];
+  let totalMs = null;
+
+  eventSource.onmessage = (msg) => {
+    try {
+      const event = JSON.parse(msg.data);
+      if (event.node === '__done__') {
+        totalMs = event.data?.total_ms || null;
+        eventSource.close();
+        eventSource = null;
+        // Refresh list to update time
+        loadTraceList();
+      } else {
+        events.push(event);
+      }
+      renderNodes(events, totalMs);
+    } catch (e) {
+      console.error('SSE parse error:', e);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    eventSource = null;
+  };
+}
+
+function renderTraceDetail(trace) {
+  const container = document.getElementById('trace-detail');
+  const totalStr = trace.total_ms != null ? `${(trace.total_ms / 1000).toFixed(2)}s` : 'running...';
+  const dateStr = trace.started_at
+    ? new Date(trace.started_at * 1000).toLocaleString('vi-VN')
+    : '';
+
+  container.innerHTML = `
+    <div class="trace-header">
+      <div class="query-text">"${escapeHtml(trace.query || '')}"</div>
+      <div class="trace-meta">
+        <span>Total: ${totalStr}</span>
+        <span>${dateStr}</span>
+        ${trace.user_id ? `<span>User: ${trace.user_id}</span>` : ''}
+        ${trace.platform ? `<span>Platform: ${trace.platform}</span>` : ''}
+      </div>
+    </div>
+    <div id="nodes-container"></div>
+  `;
+
+  if (trace.events && trace.events.length > 0) {
+    renderNodes(trace.events, trace.total_ms);
+  }
+}
+
+function renderNodes(events, totalMs) {
+  const container = document.getElementById('nodes-container');
+  if (!container) return;
+
+  container.innerHTML = events.map((event, idx) => {
+    const colorClass = NODE_COLORS[event.node] || 'fallback';
+    const duration = event.duration_ms || event.data?.duration_ms || 0;
+    const durationStr = duration > 0 ? `${Math.round(duration)}ms` : '';
+    const barWidth = totalMs && duration > 0 ? Math.min((duration / totalMs) * 100, 100) : 0;
+    const summary = getNodeSummary(event);
+
+    const detailHtml = renderNodeDetail(event);
+
+    return `
+      <div class="node-card">
+        <div class="node-card-header" onclick="toggleDetail(${idx})">
+          <div class="left">
+            <div class="node-dot color-${colorClass}"></div>
+            <span class="node-name">${event.node}</span>
+            <span class="node-summary">${summary}</span>
+          </div>
+          <span class="duration">${durationStr}</span>
+        </div>
+        <div class="duration-bar-container">
+          <div class="duration-bar bar-${colorClass}" style="width: ${barWidth}%"></div>
+        </div>
+        <div class="node-detail" id="detail-${idx}">
+          ${detailHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function getNodeSummary(event) {
+  const d = event.data || {};
+  switch (event.node) {
+    case 'IntentGuard':
+      if (d.bypass) return 'BYPASS (clarification)';
+      return d.result ? 'EHC-related: YES' : 'EHC-related: NO';
+    case 'FastRetriever':
+      const chunks = d.chunks || [];
+      if (d.reused) return `${chunks.length} chunks (reused)`;
+      return chunks.length > 0 ? `#1 score=${chunks[0].score?.toFixed(3) || '?'}` : 'no chunks';
+    case 'Orchestrator':
+      return `action=${d.action || '?'} | tool=${d.tool || '?'}`;
+    case 'FullRetriever':
+      return `top=${d.top_score?.toFixed(3) || '?'} | knowledge=${d.knowledge_loaded ? 'yes' : 'no'}`;
+    case 'Synthesizer':
+      return `confidence=${d.confidence?.toFixed(3) || '?'} → ${d.route || '?'}`;
+    case 'Generator':
+      return `answer=${d.answer_chars || '?'} chars`;
+    case 'Fallback':
+      return `reason=${d.reason || '?'} | ticket=#${d.ticket_id || '?'}`;
+    case 'ChatFallback':
+      return d.answer ? d.answer.substring(0, 40) + '...' : '';
+    default:
+      return '';
+  }
+}
+
+function renderNodeDetail(event) {
+  const d = event.data || {};
+  let rows = '';
+
+  for (const [key, value] of Object.entries(d)) {
+    if (key === 'chunks' && Array.isArray(value)) {
+      rows += `<div class="detail-row"><span class="detail-key">chunks:</span><span class="detail-value"><div class="chunk-list">`;
+      value.forEach((c, i) => {
+        rows += `<div class="chunk-item">#${i+1} score=${c.score?.toFixed(4) || '?'} "${escapeHtml(c.subject || '')}"</div>`;
+      });
+      rows += `</div></span></div>`;
+    } else if (key === 'duration_ms') {
+      // skip, shown in header
+    } else {
+      const displayVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      rows += `<div class="detail-row"><span class="detail-key">${key}:</span><span class="detail-value">${escapeHtml(displayVal)}</span></div>`;
+    }
+  }
+
+  return rows || '<span style="color:#475569">No additional data</span>';
+}
+
+function toggleDetail(idx) {
+  const el = document.getElementById(`detail-${idx}`);
+  if (el) el.classList.toggle('open');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// --- Auto-refresh ---
+loadTraceList();
+setInterval(loadTraceList, 5000);
+</script>
+</body>
+</html>
